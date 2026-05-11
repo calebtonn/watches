@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Swiss Clock Homage Screensaver // Project Spec</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fafaf7;
+    --surface: #ffffff;
+    --surface-2: #f4f3ee;
+    --border: #e5e3da;
+    --border-strong: #c9c5b8;
+    --ink: #1a1a1a;
+    --ink-2: #3d3d3a;
+    --ink-3: #6b6b66;
+    --ink-faint: #9c9b94;
+    --cyan: #0891b2;
+    --blue: #2563eb;
+    --purple: #7c3aed;
+    --red: #dc2626;
+    --green: #15803d;
+    --amber: #b45309;
+    --teal: #0f766e;
+    --rose: #be185d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; }
+  body {
+    font-family: 'Manrope', -apple-system, sans-serif;
+    background: var(--bg); color: var(--ink);
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 80px 40px 120px; }
+
+  header { border-bottom: 1px solid var(--border-strong); padding-bottom: 40px; margin-bottom: 72px; }
+  .brand {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--rose);
+    letter-spacing: 0.15em; text-transform: uppercase;
+    font-weight: 500; margin-bottom: 24px;
+  }
+  h1 {
+    font-weight: 800; font-size: 52px;
+    letter-spacing: -0.03em; line-height: 1.05;
+    margin-bottom: 20px; color: var(--ink);
+  }
+  .subtitle {
+    color: var(--ink-2); font-size: 18px;
+    line-height: 1.5; max-width: 780px;
+  }
+  .header-meta {
+    display: flex; gap: 32px; margin-top: 28px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; color: var(--ink-3); flex-wrap: wrap;
+  }
+  .header-meta span strong { color: var(--ink); font-weight: 600; margin-left: 6px; }
+
+  section { margin-bottom: 80px; }
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--ink-faint);
+    font-weight: 500; margin-bottom: 12px;
+  }
+  h2 {
+    font-weight: 700; font-size: 34px;
+    letter-spacing: -0.02em; line-height: 1.15;
+    margin-bottom: 16px; color: var(--ink);
+  }
+  .section-desc {
+    color: var(--ink-2); font-size: 17px;
+    line-height: 1.6; max-width: 780px; margin-bottom: 36px;
+  }
+
+  .callout {
+    background: #fdf2f8; border: 1px solid #fbcfe8;
+    border-left: 4px solid var(--rose);
+    border-radius: 10px; padding: 20px 24px; margin-bottom: 32px;
+  }
+  .callout.amber {
+    background: #fff8ed; border-color: #f4d4a3;
+    border-left-color: var(--amber);
+  }
+  .callout.teal {
+    background: #f0fdfa; border-color: #99f6e4;
+    border-left-color: var(--teal);
+  }
+  .callout-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--rose); margin-bottom: 6px;
+  }
+  .callout.amber .callout-tag { color: var(--amber); }
+  .callout.teal .callout-tag { color: var(--teal); }
+  .callout-text { color: var(--ink-2); font-size: 14px; line-height: 1.55; }
+  .callout-text strong { color: var(--ink); }
+  .callout-text a { color: var(--blue); text-decoration: underline; }
+
+  /* DIAL GRID */
+  .dial-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px;
+  }
+  .dial-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px 26px;
+    border-top: 3px solid var(--rose);
+  }
+  .dial-header {
+    display: flex; justify-content: space-between;
+    align-items: baseline; margin-bottom: 12px;
+    gap: 12px; flex-wrap: wrap;
+  }
+  .dial-name {
+    font-weight: 700; font-size: 20px;
+    letter-spacing: -0.01em; color: var(--ink);
+  }
+  .dial-inspiration {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--ink-3);
+    background: var(--surface-2); padding: 3px 9px;
+    border-radius: 3px; border: 1px solid var(--border);
+    font-weight: 500;
+  }
+  .dial-desc {
+    font-size: 14px; color: var(--ink-2);
+    line-height: 1.55; margin-bottom: 12px;
+  }
+  .dial-traits {
+    list-style: none; padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .dial-traits li {
+    font-size: 13px; color: var(--ink-2);
+    padding: 4px 0;
+  }
+  .dial-traits li::before {
+    content: '·'; color: var(--ink-faint);
+    margin-right: 8px; font-weight: 700;
+  }
+  .dial-traits li strong { color: var(--ink); font-weight: 600; }
+
+  /* TECH GRID */
+  .tech-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  }
+  .tech-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px;
+  }
+  .tech-card.native { border-top: 4px solid var(--blue); }
+  .tech-card.web    { border-top: 4px solid var(--teal); }
+  .tech-card h3 {
+    font-weight: 700; font-size: 22px;
+    margin-bottom: 10px; letter-spacing: -0.01em;
+  }
+  .tech-card .verdict {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 3px;
+    display: inline-block; margin-bottom: 14px;
+  }
+  .tech-card.native .verdict { background: #dbeafe; color: var(--blue); }
+  .tech-card.web .verdict { background: #f0fdfa; color: var(--teal); }
+  .tech-card > p {
+    font-size: 14px; color: var(--ink-2);
+    line-height: 1.55; margin-bottom: 18px;
+  }
+  .pros-cons {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+  }
+  .pros-cons h4 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.1em;
+    text-transform: uppercase; font-weight: 600;
+    color: var(--ink-3); margin-bottom: 8px;
+  }
+  .pros-cons ul { list-style: none; }
+  .pros-cons li {
+    font-size: 13px; color: var(--ink-2);
+    line-height: 1.5; padding: 4px 0;
+  }
+  .pros-cons .pros li::before {
+    content: '+'; color: var(--green);
+    margin-right: 8px; font-weight: 700;
+  }
+  .pros-cons .cons li::before {
+    content: '−'; color: var(--red);
+    margin-right: 8px; font-weight: 700;
+  }
+
+  /* STORY LIST */
+  .story-list {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px 32px;
+  }
+  .story {
+    display: grid; grid-template-columns: 40px 1fr;
+    gap: 16px; padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .story:last-child { border-bottom: none; }
+  .story-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 600;
+    color: var(--rose); padding-top: 2px;
+  }
+  .story-content {
+    font-size: 15px; color: var(--ink); line-height: 1.55;
+  }
+  .story-content strong { font-weight: 700; }
+  .story-content code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9em; background: var(--surface-2);
+    padding: 1px 6px; border-radius: 3px;
+    border: 1px solid var(--border); color: var(--purple);
+    font-weight: 500;
+  }
+  .story-deliverable {
+    margin-top: 4px; font-size: 13px;
+    color: var(--ink-3); font-style: italic;
+  }
+
+  footer {
+    margin-top: 80px; padding-top: 32px;
+    border-top: 1px solid var(--border-strong);
+    display: flex; justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--ink-3);
+    letter-spacing: 0.05em; font-weight: 500;
+  }
+
+  @media (max-width: 800px) {
+    .container { padding: 48px 22px 80px; }
+    h1 { font-size: 36px; }
+    h2 { font-size: 26px; }
+    .dial-grid, .tech-grid { grid-template-columns: 1fr; }
+    .pros-cons { grid-template-columns: 1fr; }
+    .header-meta { flex-direction: column; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="brand">Project 1 // BMAD Learning Vehicle</div>
+    <h1>Swiss Clock<br>Homage Screensaver</h1>
+    <p class="subtitle">A macOS screensaver with multiple analog clock face designs that pay homage to famous Swiss watches. Real shippable open-source project, used as the on-ramp to BMAD before tackling the trading system.</p>
+    <div class="header-meta">
+      <span>PROJECT <strong>Open source · MIT</strong></span>
+      <span>TARGET <strong>macOS .saver bundle</strong></span>
+      <span>EFFORT <strong>~2 weeks evenings</strong></span>
+    </div>
+  </header>
+
+  <div class="callout teal">
+    <div class="callout-tag">Why this project</div>
+    <div class="callout-text">It exercises every BMAD agent on something real. Analyst frames the audience and constraints. PM scopes the dial set and packaging. Architect designs the plugin system. SM/Dev/QA ship each dial. The plugin pattern you build here is the same pattern you'll reuse for trading strategies. And at the end you have a shippable artifact that real horology enthusiasts might actually use.</div>
+  </div>
+
+  <!-- ============ LEGAL ============ -->
+  <section>
+    <div class="section-label">01 // Legal scope</div>
+    <h2>Homages, Not Copies</h2>
+    <p class="section-desc">The single most important product decision. Get this right and you have something you can publish freely. Get it wrong and you can get cease-and-desisted by some of the most well-funded legal teams in Switzerland.</p>
+
+    <div class="callout amber">
+      <div class="callout-tag">What's allowed</div>
+      <div class="callout-text"><strong>Inspired-by silhouettes and design vocabulary.</strong> Watch case shapes, bezel motifs (octagons, fluted, tachymeters), dial textures (tapisserie patterns, sunburst, snail), hand styles (sword, dauphine, mercedes), color palettes, indices styles, complications layouts. These are design language, not protected expression. A "homage" community has existed in horology for decades — done with restraint and credit, it's a celebration of design history.</div>
+    </div>
+
+    <div class="callout">
+      <div class="callout-tag">What's NOT allowed</div>
+      <div class="callout-text"><strong>Trademarked names, logos, signed dials, distinctive trademarked elements.</strong> No "Rolex" anywhere. No five-pointed crown. No Patek Calatrava cross. No Audemars Piguet "AP" monogram. No Tudor shield. No signed maker's name on the dial. No model names — no "Submariner", "Speedmaster", "Nautilus", "Royal Oak" — these are trademarks. Refer to dials in your code and UI by your own names that evoke the inspiration without copying the trademark.</div>
+    </div>
+
+    <div class="callout teal">
+      <div class="callout-tag">Documentation</div>
+      <div class="callout-text">In your README, credit each homage's inspiration explicitly: <em>"Geneva Octagon is a homage to the integrated-bracelet luxury sports watch genre pioneered by the 1972 Audemars Piguet Royal Oak."</em> Acknowledgment + transformation = legitimate homage. Pretending it's original = problem.</div>
+    </div>
+  </section>
+
+  <!-- ============ DIAL SET ============ -->
+  <section>
+    <div class="section-label">02 // v1 dial set</div>
+    <h2>Five Initial Designs</h2>
+    <p class="section-desc">Each is a homage to a recognizable genre or piece. Names are deliberately neutral so no trademarks are infringed. The variety is intentional — covers different eras, styles, and aesthetics, exercises the plugin system, and gives users something to pick between.</p>
+
+    <div class="dial-grid">
+      <div class="dial-card">
+        <div class="dial-header">
+          <div class="dial-name">Bahnhof</div>
+          <span class="dial-inspiration">Mondaine / SBB</span>
+        </div>
+        <div class="dial-desc">The minimalist Swiss railway clock — the original reference from davenicoll's project. Stark white face, black indices, red second hand with the iconic stop-and-pause "loving" tick at 12.</div>
+        <ul class="dial-traits">
+          <li><strong>Hands:</strong> bar-style black, red "lollipop" seconds</li>
+          <li><strong>Indices:</strong> bold black bars, no numerals</li>
+          <li><strong>Motion:</strong> stop-2-second pause at 12</li>
+          <li><strong>Palette:</strong> white / black / Swiss red</li>
+        </ul>
+      </div>
+
+      <div class="dial-card">
+        <div class="dial-header">
+          <div class="dial-name">Geneva Octagon</div>
+          <span class="dial-inspiration">Royal Oak genre</span>
+        </div>
+        <div class="dial-desc">Integrated-bracelet luxury sports homage. Tapisserie-textured dial, octagonal bezel hint at the edge of the canvas, applied baton indices.</div>
+        <ul class="dial-traits">
+          <li><strong>Hands:</strong> tapered baton, lume-line down center</li>
+          <li><strong>Indices:</strong> applied batons, raised effect</li>
+          <li><strong>Texture:</strong> tapisserie waffle pattern</li>
+          <li><strong>Palette:</strong> blue / steel / off-white</li>
+        </ul>
+      </div>
+
+      <div class="dial-card">
+        <div class="dial-header">
+          <div class="dial-name">Lunaris</div>
+          <span class="dial-inspiration">Speedmaster genre</span>
+        </div>
+        <div class="dial-desc">Tool-watch chronograph aesthetic. Black dial, tachymeter bezel ring, three sub-dials at 3/6/9. The sub-dials are decorative in screensaver mode but become active functions in display modes that show seconds or date.</div>
+        <ul class="dial-traits">
+          <li><strong>Hands:</strong> straight stick, white with lume</li>
+          <li><strong>Indices:</strong> applied baton + Arabic 12</li>
+          <li><strong>Sub-dials:</strong> three, white-on-black</li>
+          <li><strong>Palette:</strong> black / white / orange accent</li>
+        </ul>
+      </div>
+
+      <div class="dial-card">
+        <div class="dial-header">
+          <div class="dial-name">Calatrava</div>
+          <span class="dial-inspiration">Dress watch genre</span>
+        </div>
+        <div class="dial-desc">Pure dress watch — the most restrained option. Silver opaline dial, gold dauphine hands, leaf-shape second hand, applied Roman numerals at 12/3/6/9. The kind of watch that whispers.</div>
+        <ul class="dial-traits">
+          <li><strong>Hands:</strong> dauphine, gold/yellow</li>
+          <li><strong>Indices:</strong> Roman + applied batons</li>
+          <li><strong>Texture:</strong> sunburst opaline</li>
+          <li><strong>Palette:</strong> silver / gold / black hands shadow</li>
+        </ul>
+      </div>
+
+      <div class="dial-card" style="grid-column: 1 / -1;">
+        <div class="dial-header">
+          <div class="dial-name">Submersible</div>
+          <span class="dial-inspiration">Dive watch genre</span>
+        </div>
+        <div class="dial-desc">Tool-watch dive aesthetic. Unidirectional bezel ring around the edge with elapsed-time markings, oversized lumed indices, mercedes-style hour hand. The bezel rotates once per hour as a clever ambient timer.</div>
+        <ul class="dial-traits">
+          <li><strong>Hands:</strong> mercedes-style hour, broad-arrow minute</li>
+          <li><strong>Indices:</strong> oversized circles/triangles, lume effect</li>
+          <li><strong>Bezel:</strong> animated unidirectional, 0–60 markings</li>
+          <li><strong>Palette:</strong> matte black / lume green / steel</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TECH CHOICE ============ -->
+  <section>
+    <div class="section-label">03 // Tech decision</div>
+    <h2>Native Swift or WebKit?</h2>
+    <p class="section-desc">A real architectural decision the architect agent will walk you through. Both work. They have different tradeoffs.</p>
+
+    <div class="tech-grid">
+      <div class="tech-card native">
+        <h3>Native Swift / SwiftUI</h3>
+        <span class="verdict">Recommended for v1</span>
+        <p>Subclass <code style="font-family:'JetBrains Mono',monospace;font-size:0.92em;background:var(--surface-2);padding:1px 6px;border-radius:3px;border:1px solid var(--border);">ScreenSaverView</code>, render each dial in Core Graphics or SwiftUI Canvas. Each dial is a Swift type implementing a <code style="font-family:'JetBrains Mono',monospace;font-size:0.92em;background:var(--surface-2);padding:1px 6px;border-radius:3px;border:1px solid var(--border);">DialRenderer</code> protocol.</p>
+        <div class="pros-cons">
+          <div class="pros">
+            <h4>Pros</h4>
+            <ul>
+              <li>Native perf, no WebView overhead</li>
+              <li>Same idioms as macOS itself</li>
+              <li>App Store distribution path if you want it</li>
+              <li>Sharper text rendering, retina-correct</li>
+            </ul>
+          </div>
+          <div class="cons">
+            <h4>Cons</h4>
+            <ul>
+              <li>Swift learning curve if you're new to it</li>
+              <li>Core Graphics drawing is verbose</li>
+              <li>Xcode is mandatory</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="tech-card web">
+        <h3>WebKit-hosted HTML/SVG</h3>
+        <span class="verdict">Faster start</span>
+        <p>ScreenSaverView hosts a WKWebView. Each dial is HTML/CSS/SVG/JS. Reference project (davenicoll's) uses this approach. Faster to prototype, especially if you're more comfortable with web tech.</p>
+        <div class="pros-cons">
+          <div class="pros">
+            <h4>Pros</h4>
+            <ul>
+              <li>SVG is forgiving for clock graphics</li>
+              <li>CSS animations for hand sweeps</li>
+              <li>Reload to iterate without rebuild</li>
+              <li>You probably know it already</li>
+            </ul>
+          </div>
+          <div class="cons">
+            <h4>Cons</h4>
+            <ul>
+              <li>WebView memory overhead</li>
+              <li>Animation framerate less predictable</li>
+              <li>Anti-aliasing quirks at retina densities</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div class="callout-tag">Recommendation</div>
+      <div class="callout-text">Start with <strong>WebKit-hosted SVG</strong> if you want to ship fastest. Move to <strong>native Swift</strong> for v2 if performance bothers you or you want App Store distribution. The plugin system you'll design should let you swap rendering tech per-dial — useful escape hatch.</div>
+    </div>
+  </section>
+
+  <!-- ============ STORIES ============ -->
+  <section>
+    <div class="section-label">04 // BMAD stories</div>
+    <h2>Story Outline</h2>
+    <p class="section-desc">Roughly how the SM agent will shard the work. Each story is one Claude Code session. Use this as a starting point, let SM refine.</p>
+
+    <div class="story-list">
+      <div class="story">
+        <div class="story-num">S1</div>
+        <div class="story-content"><strong>Project skeleton + .saver bundle.</strong> Xcode project, ScreenSaverView subclass, hello-world dial that renders a circle and ticking hand. Installable as <code>.saver</code>.</div>
+      </div>
+      <div class="story">
+        <div class="story-num">S2</div>
+        <div class="story-content"><strong>Dial plugin protocol.</strong> <code>DialRenderer</code> protocol defining the contract: dimensions, dirty regions, draw at time t, preferences schema. First concrete dial conforms to it.</div>
+      </div>
+      <div class="story">
+        <div class="story-num">S3</div>
+        <div class="story-content"><strong>Time + animation pipeline.</strong> NTP-synced wall clock (no drift over the screensaver session), hand position interpolation, smooth vs ticking second-hand modes.</div>
+      </div>
+      <div class="story">
+        <div class="story-num">S4</div>
+        <div class="story-content"><strong>Bahnhof dial.</strong> Including the famous stop-2-second pause at 12 — actually a subtle animation detail that's harder than it looks.</div>
+      </div>
+      <div class="story">
+        <div class="story-num">S5</div>
+        <div class="story-content"><strong>Geneva Octagon dial.</strong> Tapisserie texture as an SVG pattern, octagonal hint at the canvas edge, applied indices with raised shadow effect.</div>
+      </div>
+      <div class="story">
+        <div class="story-num">S6</div>
+        <div class="story-content"><strong>Lunaris dial.</strong> Three sub-dials + tachymeter ring. Sub-dials are visual-only in v1.</div>
+        <div class="story-deliverable">Optional v2: live running-seconds sub-dial.</div>
+      </div>
+      <div class="story">
+        <div class="story-num">S7</div>
+        <div class="story-content"><strong>Calatrava dial.</strong> Roman numerals + sunburst pattern. Tests your design discipline — the simplest dial visually but the hardest to nail.</div>
+      </div>
+      <div class="story">
+        <div class="story-num">S8</div>
+        <div class="story-content"><strong>Submersible dial.</strong> Animated rotating bezel ring + mercedes hands. Lume effect for indices.</div>
+      </div>
+      <div class="story">
+        <div class="story-num">S9</div>
+        <div class="story-content"><strong>Preferences pane.</strong> macOS standard preferences UI for the screensaver. Dial selector with previews. Optional: per-dial preferences (e.g., bezel rotation speed).</div>
+      </div>
+      <div class="story">
+        <div class="story-num">S10</div>
+        <div class="story-content"><strong>Multi-monitor + retina.</strong> Render correctly on multiple displays at different DPIs. Edge case that bites if not handled explicitly.</div>
+      </div>
+      <div class="story">
+        <div class="story-num">S11</div>
+        <div class="story-content"><strong>Packaging + README.</strong> Build script that produces a signed <code>.saver</code> bundle. README with screenshots, installation, design notes per dial.</div>
+      </div>
+      <div class="story">
+        <div class="story-num">S12</div>
+        <div class="story-content"><strong>GitHub release.</strong> Tag v1.0, attach <code>.saver</code> to the release. Optional: post to MacRumors forums, HN, r/Watches.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ BMAD LESSONS ============ -->
+  <section>
+    <div class="section-label">05 // What you'll learn</div>
+    <h2>BMAD Muscles This Builds</h2>
+    <p class="section-desc">Every lesson here transfers directly to the trading system.</p>
+
+    <div class="callout teal">
+      <div class="callout-tag">Plugin systems</div>
+      <div class="callout-text">The <code style="font-family:'JetBrains Mono',monospace;font-size:0.85em;background:var(--surface);padding:1px 5px;border-radius:3px;border:1px solid var(--border);">DialRenderer</code> protocol is structurally identical to the <code style="font-family:'JetBrains Mono',monospace;font-size:0.85em;background:var(--surface);padding:1px 5px;border-radius:3px;border:1px solid var(--border);">Strategy</code> base class for trading. Each dial is independent. Adding a new dial is dropping a folder. Same pattern, lower stakes.</div>
+    </div>
+
+    <div class="callout teal">
+      <div class="callout-tag">Product scope discipline</div>
+      <div class="callout-text">"Five dials in v1" is the same skill as "two strategies in v1" for the trading system. The PM agent will push back if you scope too wide. Learning to push back well is exactly what saves you on the trading system.</div>
+    </div>
+
+    <div class="callout teal">
+      <div class="callout-tag">Real-world constraints</div>
+      <div class="callout-text">The legal homage-vs-copy line is real friction that BMAD's planning agents handle well if you bring it up. Same shape as the trading system's surveillance/compliance constraints — different domain, identical skill.</div>
+    </div>
+
+    <div class="callout teal">
+      <div class="callout-tag">SM/Dev/QA rhythm</div>
+      <div class="callout-text">By the time you finish 12 stories on the screensaver, the rhythm is automatic. You're reading every story, every diff. You know what a good story looks like and what a too-big story looks like. That fluency is the entire point.</div>
+    </div>
+  </section>
+
+  <footer>
+    <div>SWISS CLOCK HOMAGE // SPEC-0.1</div>
+    <div>HOMAGE · NOT COPY · SHIP IT</div>
+  </footer>
+
+</div>
+</body>
+</html>

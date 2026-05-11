@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Local Claude Code config (personal, not project content)
+.claude/
+
+# BMAD installer-managed user prefs (regenerated on each install)
+_bmad/config.user.toml
