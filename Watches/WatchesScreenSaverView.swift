@@ -1,5 +1,6 @@
 import ScreenSaver
 import QuartzCore
+import WatchesCore
 
 /// Principal class for the Watches screen saver bundle.
 ///
@@ -40,6 +41,16 @@ final class WatchesScreenSaverView: ScreenSaverView {
         installRenderer()
         observePowerState()
         self.exitWatchdog = ExitWatchdog(owner: self)
+
+        // Stutter mitigation: keep the dial contents invisible until the
+        // display link has warmed up. The screensaver host shows the black
+        // background during this period. Revealed in `startAnimation` after
+        // a short delay via a default fade-in animation. Caught visually in
+        // Story 1.4 verification.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer?.opacity = 0
+        CATransaction.commit()
     }
 
     @available(*, unavailable)
@@ -88,6 +99,34 @@ final class WatchesScreenSaverView: ScreenSaverView {
 
         startDisplayLink()
         Logging.host.info("startAnimation: display link started")
+
+        // CADisplayLink can take up to ~1s to synchronize with the screen and
+        // fire its first event. Manually drive ticks for the first second so
+        // the display link is effectively warm by the time we reveal.
+        // Caught visually in Story 1.4 verification.
+        scheduleStartupKickTicks()
+        scheduleRevealAfterWarmup()
+    }
+
+    /// Drives ~5 manual ticks over the first second after startAnimation, to
+    /// cover the gap before CADisplayLink begins firing naturally.
+    private func scheduleStartupKickTicks() {
+        for delay in stride(from: 0.0, through: 1.0, by: 0.2) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self else { return }
+                _ = self.renderer?.tick(reduceMotion: self.reduceMotion.isEnabled)
+            }
+        }
+    }
+
+    /// Reveals the dial (fade from opacity 0 → 1) after a short warm-up
+    /// window so the display link is firing smoothly by the time content
+    /// is visible. Background stays black during warm-up.
+    private func scheduleRevealAfterWarmup() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            // Default implicit animation gives a graceful ~0.25s fade-in.
+            self?.layer?.opacity = 1
+        }
     }
 
     override func stopAnimation() {

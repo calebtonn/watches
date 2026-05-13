@@ -8,10 +8,10 @@ import Foundation
 ///
 /// The host instantiates dials via `init()` on the metatype, so each
 /// renderer's `DialRenderer.init()` runs to produce the per-display instance.
-enum DialRegistry {
+public enum DialRegistry {
 
     /// All registered dial types, in picker order (Story 3.1).
-    static let all: [DialRenderer.Type] = [
+    public static let all: [DialRenderer.Type] = [
         ProofOfHostRenderer.self,
         // Story 1.5: + RoyaleRenderer.self
         // Story 1.6: + AsymmetricMoonphaseRenderer.self
@@ -24,14 +24,14 @@ enum DialRegistry {
     /// Returns dial types whose visibility matches the filter.
     /// `includingHidden: false` excludes `.hidden` dials (default for the
     /// user-facing picker). `includingHidden: true` returns all dials.
-    static func visible(includingHidden: Bool) -> [DialRenderer.Type] {
+    public static func visible(includingHidden: Bool) -> [DialRenderer.Type] {
         all.filter { $0.visibility == .default || includingHidden }
     }
 
     /// Looks up a registered dial type by its `identity.id`. Returns `nil` if
     /// no dial with that ID is registered. Used by the host to resolve the
     /// user's `selectedDialID` from `ScreenSaverDefaults`.
-    static func byID(_ id: String) -> DialRenderer.Type? {
+    public static func byID(_ id: String) -> DialRenderer.Type? {
         all.first { $0.identity.id == id }
     }
 }

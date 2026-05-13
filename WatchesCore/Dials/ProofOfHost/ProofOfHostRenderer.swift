@@ -7,18 +7,18 @@ import QuartzCore
 /// any real dial lands. Visibility is `.hidden` — users never see it in the
 /// picker. May be removed in a future story once Royale (1.5) and Asymmetric
 /// Moonphase (1.6) prove the protocol against the two hardest stress cases.
-final class ProofOfHostRenderer: DialRenderer {
+public final class ProofOfHostRenderer: DialRenderer {
 
     // MARK: DialRenderer static metadata
 
-    static let identity = DialIdentity(
+    public static let identity = DialIdentity(
         id: "proofOfHost",
         displayName: "Proof of Host",
         homageCredit: "Internal developer dial; no horological inspiration.",
         previewAssetName: ""    // no thumbnail; not user-visible
     )
 
-    static let visibility: DialVisibility = .hidden
+    public static let visibility: DialVisibility = .hidden
 
     // MARK: State
 
@@ -36,23 +36,32 @@ final class ProofOfHostRenderer: DialRenderer {
 
     // MARK: Init
 
-    init() {
+    public init() {
         // No setup here; the host calls attach() with everything we need.
     }
 
     // MARK: DialRenderer
 
-    func attach(rootLayer: CALayer, canvas: CGSize, timeSource: TimeSource) {
+    public func attach(rootLayer: CALayer, canvas: CGSize, timeSource: TimeSource) {
         self.rootLayer = rootLayer
         self.canvas = canvas
         self.timeSource = timeSource
 
         installLayers()
         layoutLayers(for: canvas)
+
+        // Apply the correct rotation immediately so the FIRST visible frame
+        // shows the hand at the current-time position — not the identity-
+        // transform default (12 o'clock). Caught visually in Story 1.4
+        // verification: previously the hand rendered at 12 then jumped to
+        // its correct angle on the first display-link tick.
+        // `reduceMotion: false` here is fine — the difference between sweep
+        // and snap modes at attach time is sub-pixel.
+        _ = tick(reduceMotion: false)
     }
 
     @discardableResult
-    func tick(reduceMotion: Bool) -> [CGRect] {
+    public func tick(reduceMotion: Bool) -> [CGRect] {
         guard let timeSource else { return [] }
 
         // Decompose to seconds-with-subsecond once per tick (P4 — through TimeSource only).
@@ -89,12 +98,12 @@ final class ProofOfHostRenderer: DialRenderer {
         return [secondHandLayer.frame]
     }
 
-    func canvasDidChange(to canvas: CGSize) {
+    public func canvasDidChange(to canvas: CGSize) {
         self.canvas = canvas
         layoutLayers(for: canvas)
     }
 
-    func detach() {
+    public func detach() {
         circleLayer.removeFromSuperlayer()
         secondHandLayer.removeFromSuperlayer()
         rootLayer = nil
@@ -105,6 +114,12 @@ final class ProofOfHostRenderer: DialRenderer {
 
     private func installLayers() {
         guard let rootLayer else { return }
+
+        // Suppress implicit animations on the initial setup so the first frame
+        // doesn't fade in over ~0.25s. Caught visually in Story 1.4 verification.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
 
         circleLayer.name = "proofOfHost.circle"
         circleLayer.strokeColor = NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 1).cgColor
@@ -126,6 +141,12 @@ final class ProofOfHostRenderer: DialRenderer {
         // with NSRect.zero in preview-thumbnail or first-load paths; we skip
         // layout until a real size arrives via `canvasDidChange`.
         guard canvas.width > 0, canvas.height > 0 else { return }
+
+        // Suppress implicit animations on geometry changes (frame/position/bounds
+        // are all animatable by default).
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
 
         let center = CGPoint(x: canvas.width / 2, y: canvas.height / 2)
         let radius = min(canvas.width, canvas.height) * 0.4

@@ -14,7 +14,7 @@ import os
 /// teardown without depending on the concrete host type. This narrow
 /// callback contract keeps `ExitWatchdog` decoupled from the host's
 /// display-link / renderer / observer plumbing.
-protocol ExitWatchdogOwner: AnyObject {
+public protocol ExitWatchdogOwner: AnyObject {
     /// Called when `com.apple.screensaver.willstop` is posted (or defensively
     /// at `didstop` if `willstop` was skipped).
     /// Must be idempotent — safe to call multiple times.
@@ -59,18 +59,18 @@ protocol ExitWatchdogOwner: AnyObject {
 /// owns its own `ExitWatchdog`. On multi-display systems this means N
 /// watchdogs all racing on `didstop` — first to fire `exit(0)` wins,
 /// the rest are no-ops since the process is gone. Wasteful but correct.
-final class ExitWatchdog {
+public final class ExitWatchdog {
 
     /// Per ADR-003: 5 seconds is davenicoll's tuned value — long enough
     /// for a normal exit to land, short enough that the bug-path force-
     /// exit feels responsive on unlock.
-    static let watchdogInterval: TimeInterval = 5.0
+    public static let watchdogInterval: TimeInterval = 5.0
 
     /// Tolerance for stale-timer detection (Story 1.3 review patch).
     /// If `Date().timeIntervalSince(armTime)` exceeds this, the timer
     /// has been delayed past usefulness (e.g., system slept) and we
     /// refuse to call `exit(0)`. 2× the configured interval.
-    static let staleTimerThreshold: TimeInterval = watchdogInterval * 2
+    public static let staleTimerThreshold: TimeInterval = watchdogInterval * 2
 
     private weak var owner: ExitWatchdogOwner?
 
@@ -87,7 +87,7 @@ final class ExitWatchdog {
     /// (Story 1.3 review patch).
     private var hasFired: Bool = false
 
-    init(owner: ExitWatchdogOwner) {
+    public init(owner: ExitWatchdogOwner) {
         self.owner = owner
         installObservers()
         Logging.exit.info("ExitWatchdog installed.")

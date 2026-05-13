@@ -13,7 +13,7 @@ import QuartzCore
 /// owning — `CALayer`, `CABasicAnimation`, `CADisplayLink` are all reference-
 /// typed. Value semantics would fight Swift's ergonomics for the renderer's
 /// natural shape (D2 in the architecture).
-protocol DialRenderer: AnyObject {
+public protocol DialRenderer: AnyObject {
     /// Static metadata for the registry and prefs picker.
     static var identity: DialIdentity { get }
 
@@ -54,27 +54,34 @@ protocol DialRenderer: AnyObject {
 }
 
 /// Static metadata for a dial: identity, display name, credit, preview asset.
-struct DialIdentity {
+public struct DialIdentity {
     /// Stable identifier matching the camelCase form of the type prefix.
     /// e.g. `AsymmetricMoonphaseRenderer` → `"asymmetricMoonphase"`.
     /// Persisted as `selectedDialID` in `ScreenSaverDefaults`.
-    let id: String
+    public let id: String
 
     /// Human-readable label shown in the prefs picker.
-    let displayName: String
+    public let displayName: String
 
     /// One-sentence inline credit. Used in the prefs pane and the README.
     /// e.g. `"Inspired by the A. Lange & Söhne Lange 1 Moonphase"`.
-    let homageCredit: String
+    public let homageCredit: String
 
     /// Bundle resource name for the picker thumbnail (Story 3.1).
     /// Empty string indicates no thumbnail (hidden dials).
-    let previewAssetName: String
+    public let previewAssetName: String
+
+    public init(id: String, displayName: String, homageCredit: String, previewAssetName: String) {
+        self.id = id
+        self.displayName = displayName
+        self.homageCredit = homageCredit
+        self.previewAssetName = previewAssetName
+    }
 }
 
 /// Default visibility means the dial appears in the picker normally.
 /// Hidden dials require the reveal gesture (Story 3.2; Royale uses this).
-enum DialVisibility {
+public enum DialVisibility {
     case `default`
     case hidden
 }

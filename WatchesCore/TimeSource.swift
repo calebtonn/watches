@@ -7,7 +7,7 @@ import QuartzCore
 /// architecture). Direct calls to `Date()` or `CACurrentMediaTime()` outside
 /// `SystemTimeSource` are forbidden — the abstraction lets `FixedTimeSource`
 /// substitute for renderer XCTest in Story 1.4.
-protocol TimeSource: AnyObject {
+public protocol TimeSource: AnyObject {
     /// Current wall-clock time. Reflects NTP corrections; may jump.
     var now: Date { get }
 
@@ -17,26 +17,27 @@ protocol TimeSource: AnyObject {
 }
 
 /// Production time source backed by `Date()` and `CACurrentMediaTime()`.
-final class SystemTimeSource: TimeSource {
-    var now: Date { Date() }
-    var monotonic: TimeInterval { CACurrentMediaTime() }
+public final class SystemTimeSource: TimeSource {
+    public init() {}
+    public var now: Date { Date() }
+    public var monotonic: TimeInterval { CACurrentMediaTime() }
 }
 
 /// Test-time source with explicit, mutable time.
 ///
 /// Used by Story 1.4 XCTest fixtures. Production code MUST NOT instantiate this.
-final class FixedTimeSource: TimeSource {
-    private(set) var now: Date
-    private(set) var monotonic: TimeInterval
+public final class FixedTimeSource: TimeSource {
+    public private(set) var now: Date
+    public private(set) var monotonic: TimeInterval
 
-    init(now: Date, monotonic: TimeInterval = 0) {
+    public init(now: Date, monotonic: TimeInterval = 0) {
         self.now = now
         self.monotonic = monotonic
     }
 
     /// Advance both wall-clock and monotonic by the same interval.
     /// Use this in tests to simulate the passage of time.
-    func advance(by interval: TimeInterval) {
+    public func advance(by interval: TimeInterval) {
         now = now.addingTimeInterval(interval)
         monotonic += interval
     }

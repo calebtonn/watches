@@ -10,12 +10,12 @@ import AppKit
 /// value when the notification fires.
 ///
 /// Honors NFR14 per the architecture.
-final class ReduceMotionObserver: NSObject {
-    private(set) var isEnabled: Bool
+public final class ReduceMotionObserver: NSObject {
+    public private(set) var isEnabled: Bool
 
     private var notificationToken: NSObjectProtocol?
 
-    override init() {
+    public override init() {
         self.isEnabled = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         super.init()
 

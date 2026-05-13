@@ -12,11 +12,11 @@ import os
 /// Filter in Console.app by `subsystem:com.calebtonn.watches`.
 ///
 /// `print(...)` is forbidden in shipping code (P6). Use these loggers instead.
-enum Logging {
-    static let subsystem = "com.calebtonn.watches"
+public enum Logging {
+    public static let subsystem = "com.calebtonn.watches"
 
-    static let host     = Logger(subsystem: subsystem, category: "host")
-    static let renderer = Logger(subsystem: subsystem, category: "renderer")
-    static let prefs    = Logger(subsystem: subsystem, category: "prefs")
-    static let exit     = Logger(subsystem: subsystem, category: "exit")
+    public static let host     = Logger(subsystem: subsystem, category: "host")
+    public static let renderer = Logger(subsystem: subsystem, category: "renderer")
+    public static let prefs    = Logger(subsystem: subsystem, category: "prefs")
+    public static let exit     = Logger(subsystem: subsystem, category: "exit")
 }

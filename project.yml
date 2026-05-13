@@ -3,6 +3,13 @@
 # Source of truth for the Xcode project. The generated Watches.xcodeproj/
 # is gitignored; run `xcodegen` (or `make project`) to regenerate it.
 #
+# Three-target structure (Story 1.4):
+#   - WatchesCore  — framework containing protocol, math, registry, dials.
+#                    Testable via XCTest (MH_DYLIB is linkable).
+#   - Watches      — .saver bundle (CFBundle). Embeds WatchesCore. Contains
+#                    only WatchesScreenSaverView (the principal class).
+#   - WatchesTests — XCTest target linking against WatchesCore.
+#
 # Build/install scaffolding patterns informed by:
 #   davenicoll/swiss-railway-clock-screensaver (MIT)
 #   https://github.com/davenicoll/swiss-railway-clock-screensaver
@@ -32,11 +39,33 @@ settings:
     MARKETING_VERSION: "0.1.0"
 
 targets:
+  WatchesCore:
+    type: framework
+    platform: macOS
+    sources:
+      - path: WatchesCore
+        excludes:
+          - "**/*.md"   # per-dial notes.md are design documentation, not resources
+    settings:
+      base:
+        PRODUCT_NAME: WatchesCore
+        PRODUCT_BUNDLE_IDENTIFIER: com.calebtonn.WatchesCore
+        DEFINES_MODULE: YES
+        GENERATE_INFOPLIST_FILE: YES
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@loader_path/Frameworks"
+          - "@loader_path/../Frameworks"
+          - "@executable_path/../Frameworks"
+
   Watches:
     type: bundle
     platform: macOS
     sources:
       - path: Watches
+    dependencies:
+      - target: WatchesCore
+        embed: true
+        codeSign: true
     settings:
       base:
         PRODUCT_NAME: Watches
@@ -46,3 +75,32 @@ targets:
         DEFINES_MODULE: YES
         LD_RUNPATH_SEARCH_PATHS:
           - "@loader_path/../Frameworks"
+
+  WatchesTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: WatchesTests
+    dependencies:
+      - target: WatchesCore
+        embed: false
+        link: true
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.calebtonn.WatchesTests
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+
+schemes:
+  Watches:
+    build:
+      targets:
+        WatchesCore: all
+        Watches: all
+        WatchesTests: [test]
+    test:
+      targets:
+        - WatchesTests

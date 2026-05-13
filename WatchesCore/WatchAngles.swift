@@ -22,23 +22,23 @@ import Foundation
 ///
 /// Per P3 in the architecture: every dial that uses watch-angle math uses
 /// this helper. Never re-derive radian conversions inline.
-enum WatchAngles {
+public enum WatchAngles {
 
     /// Hour hand angle. `h` is in [0, 12); `m` is the minute supplement.
     /// e.g. `hour(3, minute: 30)` → 3:30 hour position (between 3 and 4).
-    static func hour(_ h: Double, minute m: Double = 0) -> CGFloat {
+    public static func hour(_ h: Double, minute m: Double = 0) -> CGFloat {
         let totalHours = h.truncatingRemainder(dividingBy: 12) + m / 60.0
         return CGFloat(-totalHours / 12.0 * 2 * .pi)
     }
 
     /// Minute hand angle. `m` is in [0, 60); `s` is the second supplement.
-    static func minute(_ m: Double, second s: Double = 0) -> CGFloat {
+    public static func minute(_ m: Double, second s: Double = 0) -> CGFloat {
         let totalMinutes = m.truncatingRemainder(dividingBy: 60) + s / 60.0
         return CGFloat(-totalMinutes / 60.0 * 2 * .pi)
     }
 
     /// Second hand angle. `s` is in [0, 60) and may have sub-second precision.
-    static func second(_ s: Double) -> CGFloat {
+    public static func second(_ s: Double) -> CGFloat {
         let totalSeconds = s.truncatingRemainder(dividingBy: 60)
         return CGFloat(-totalSeconds / 60.0 * 2 * .pi)
     }

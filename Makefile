@@ -5,7 +5,7 @@
 #   https://github.com/davenicoll/swiss-railway-clock-screensaver
 # Re-implemented for the Watches project.
 
-.PHONY: project build install-dev clean
+.PHONY: project build install-dev test clean
 
 PRODUCT      := Watches
 BUNDLE       := $(PRODUCT).saver
@@ -36,6 +36,14 @@ install-dev: build
 	@echo ""
 	@echo "Installed $(BUNDLE) to $(INSTALL_DIR)"
 	@echo "Open System Settings -> Screen Saver to select."
+
+# Run the XCTest suite (WatchesTests). Suite covers pure render math only
+# per ADR-001 / D12 (test boundary). Target: ~20 tests, <1s suite duration.
+test: project
+	xcodebuild -project $(PRODUCT).xcodeproj \
+	           -scheme $(SCHEME) \
+	           -destination 'platform=macOS' \
+	           test
 
 # Remove generated build artifacts and the generated Xcode project.
 clean:
