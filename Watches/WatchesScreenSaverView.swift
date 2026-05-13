@@ -42,15 +42,16 @@ final class WatchesScreenSaverView: ScreenSaverView {
         observePowerState()
         self.exitWatchdog = ExitWatchdog(owner: self)
 
-        // Stutter mitigation: keep the dial contents invisible until the
-        // display link has warmed up. The screensaver host shows the black
-        // background during this period. Revealed in `startAnimation` after
-        // a short delay via a default fade-in animation. Caught visually in
-        // Story 1.4 verification.
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        layer?.opacity = 0
-        CATransaction.commit()
+        // Stutter mitigation: hide the dial during init so the brief window
+        // between `init?` returning and `startAnimation` firing doesn't render
+        // a single full-opacity frame (which `startAnimation`'s re-hide would
+        // then have to clobber, producing a visible flash).
+        //
+        // Gated by `!isPreview` so System Settings preview tiles render normally
+        // — preview never reaches the reveal path.
+        if !isPreview {
+            applyInitialHide()
+        }
     }
 
     @available(*, unavailable)
@@ -97,6 +98,14 @@ final class WatchesScreenSaverView: ScreenSaverView {
             installRenderer()
         }
 
+        // Re-arm the warmup hide for stop/start cycles. `init?` already hid
+        // the layer for the first activation; this covers subsequent
+        // `stopAnimation` → `startAnimation` round-trips where opacity is back
+        // at 1. Skipped in preview to keep the tile visible.
+        if !isPreview {
+            applyInitialHide()
+        }
+
         startDisplayLink()
         Logging.host.info("startAnimation: display link started")
 
@@ -108,10 +117,12 @@ final class WatchesScreenSaverView: ScreenSaverView {
         scheduleRevealAfterWarmup()
     }
 
-    /// Drives ~5 manual ticks over the first second after startAnimation, to
-    /// cover the gap before CADisplayLink begins firing naturally.
+    /// Drives 5 manual ticks at 0.2s intervals over the first second after
+    /// `startAnimation`, covering the gap before CADisplayLink begins firing
+    /// naturally. The `attach()` call already produced the t=0 tick, so this
+    /// starts at t=0.2.
     private func scheduleStartupKickTicks() {
-        for delay in stride(from: 0.0, through: 1.0, by: 0.2) {
+        for delay in stride(from: 0.2, through: 1.0, by: 0.2) {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 guard let self else { return }
                 _ = self.renderer?.tick(reduceMotion: self.reduceMotion.isEnabled)
@@ -119,11 +130,23 @@ final class WatchesScreenSaverView: ScreenSaverView {
         }
     }
 
+    /// Sets `layer.opacity = 0` instantly (no implicit animation). Shared by
+    /// `init?` (first-activation hide, suppressing the initial-frame flash)
+    /// and `startAnimation` (re-arm after stop/start cycles).
+    private func applyInitialHide() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer?.opacity = 0
+        CATransaction.commit()
+    }
+
     /// Reveals the dial (fade from opacity 0 → 1) after a short warm-up
     /// window so the display link is firing smoothly by the time content
-    /// is visible. Background stays black during warm-up.
+    /// is visible. Background stays black during warm-up. The remaining
+    /// manual kicks (t=0.6/0.8/1.0) keep the hand moving while the display
+    /// link finishes converging.
     private func scheduleRevealAfterWarmup() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             // Default implicit animation gives a graceful ~0.25s fade-in.
             self?.layer?.opacity = 1
         }
