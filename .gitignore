@@ -13,6 +13,7 @@ _bmad/bmm/
 _bmad/core/
 _bmad/scripts/
 _bmad/config.toml
+_bmad/custom/
 
 # BMAD planning + implementation artifacts — tracked in private planning repo
 _bmad-output/
