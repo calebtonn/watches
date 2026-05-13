@@ -20,6 +20,7 @@ final class WatchesScreenSaverView: ScreenSaverView {
     private var renderer: DialRenderer?
     private var displayLink: CADisplayLink?
     private var powerStateObserver: NSObjectProtocol?
+    private var exitWatchdog: ExitWatchdog?
 
     /// Identity of the `CALayer` instance the renderer is currently attached to.
     /// If AppKit recreates `self.layer` (display reconfiguration, pause/resume),
@@ -38,6 +39,7 @@ final class WatchesScreenSaverView: ScreenSaverView {
 
         installRenderer()
         observePowerState()
+        self.exitWatchdog = ExitWatchdog(owner: self)
     }
 
     @available(*, unavailable)
@@ -50,11 +52,25 @@ final class WatchesScreenSaverView: ScreenSaverView {
     }
 
     deinit {
+        tearDown()
+    }
+
+    /// Idempotent teardown: invalidate display link, remove power-state observer,
+    /// detach renderer, and clear stored layer reference. Safe to call multiple
+    /// times — used by both `deinit` and `tearDownForExit()` (the latter invoked
+    /// by `ExitWatchdog` when macOS posts `com.apple.screensaver.willstop`).
+    private func tearDown() {
+        displayLink?.invalidate()
+        displayLink = nil
+
         if let token = powerStateObserver {
             NotificationCenter.default.removeObserver(token)
+            powerStateObserver = nil
         }
-        displayLink?.invalidate()
+
         renderer?.detach()
+        renderer = nil
+        rendererAttachedTo = nil
     }
 
     // MARK: ScreenSaverView overrides
@@ -177,5 +193,17 @@ final class WatchesScreenSaverView: ScreenSaverView {
         window?.backingScaleFactor
             ?? NSScreen.main?.backingScaleFactor
             ?? 2
+    }
+}
+
+// MARK: - ExitWatchdogOwner
+
+extension WatchesScreenSaverView: ExitWatchdogOwner {
+    /// Called by `ExitWatchdog` when `com.apple.screensaver.willstop` arrives.
+    /// Routes to the shared idempotent `tearDown()` so this code path is the
+    /// same as `deinit`'s cleanup. See ADR-003 for the Sonoma exit-bug context.
+    func tearDownForExit() {
+        Logging.exit.info("tearDownForExit invoked by ExitWatchdog.")
+        tearDown()
     }
 }
