@@ -19,3 +19,16 @@ _bmad-output/
 
 # Developer-side reference imagery (homage source photos; legal posture + not product)
 faces/
+
+# Xcode build artifacts
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Generated Xcode project — regenerated from project.yml via `make project` (xcodegen)
+Watches.xcodeproj/
+
+# DMG build output (lives in dist/, populated by Story 3.5)
+dist/
+

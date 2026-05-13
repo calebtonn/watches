@@ -1,0 +1,48 @@
+# Watches — xcodegen project specification
+#
+# Source of truth for the Xcode project. The generated Watches.xcodeproj/
+# is gitignored; run `xcodegen` (or `make project`) to regenerate it.
+#
+# Build/install scaffolding patterns informed by:
+#   davenicoll/swiss-railway-clock-screensaver (MIT)
+#   https://github.com/davenicoll/swiss-railway-clock-screensaver
+# Re-implemented for the Watches project.
+
+name: Watches
+
+options:
+  bundleIdPrefix: com.calebtonn
+  deploymentTarget:
+    macOS: "14.0"
+  developmentLanguage: en
+  defaultConfig: Release
+  groupSortPosition: top
+  createIntermediateGroups: true
+
+settings:
+  base:
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    SKIP_INSTALL: YES
+    DEAD_CODE_STRIPPING: YES
+    ENABLE_HARDENED_RUNTIME: NO
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.1.0"
+
+targets:
+  Watches:
+    type: bundle
+    platform: macOS
+    sources:
+      - path: Watches
+    settings:
+      base:
+        PRODUCT_NAME: Watches
+        PRODUCT_BUNDLE_IDENTIFIER: com.calebtonn.watches
+        WRAPPER_EXTENSION: saver
+        INFOPLIST_FILE: Watches/Info.plist
+        DEFINES_MODULE: YES
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@loader_path/../Frameworks"
