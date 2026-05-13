@@ -29,6 +29,11 @@ final class ProofOfHostRenderer: DialRenderer {
     private let circleLayer = CAShapeLayer()
     private let secondHandLayer = CAShapeLayer()
 
+    /// Last integer-second value rendered. Used by `tick(reduceMotion:)` under
+    /// reduce-motion mode to suppress redundant transform updates when the
+    /// integer second has not advanced.
+    private var lastRenderedSecond: Int?
+
     // MARK: Init
 
     init() {
@@ -57,15 +62,30 @@ final class ProofOfHostRenderer: DialRenderer {
         let secondValue = Double(components.second ?? 0)
                         + Double(components.nanosecond ?? 0) / 1_000_000_000
 
-        // Reduce-motion contract: drop sub-second smoothing → 1 FPS ticks.
-        let resolvedSeconds = reduceMotion ? floor(secondValue) : secondValue
-        let angle = WatchAngles.second(resolvedSeconds)
+        // Reduce-motion contract: hand truly ticks at 1 FPS — skip the transform
+        // update entirely when the integer second has not advanced. Avoids 30 redundant
+        // transform writes per second to the same angle. (P7, addressed in Story 1.2 review.)
+        if reduceMotion {
+            let integerSecond = Int(floor(secondValue))
+            if integerSecond == lastRenderedSecond {
+                return []   // nothing changed; no dirty rects
+            }
+            lastRenderedSecond = integerSecond
+            let angle = WatchAngles.second(Double(integerSecond))
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            secondHandLayer.setAffineTransform(.init(rotationAngle: angle))
+            CATransaction.commit()
+            return [secondHandLayer.frame]
+        }
 
+        // Normal mode: sweep with sub-second precision.
+        lastRenderedSecond = nil   // reset so reduce-motion can re-arm on toggle
+        let angle = WatchAngles.second(secondValue)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         secondHandLayer.setAffineTransform(.init(rotationAngle: angle))
         CATransaction.commit()
-
         return [secondHandLayer.frame]
     }
 
@@ -102,6 +122,11 @@ final class ProofOfHostRenderer: DialRenderer {
     }
 
     private func layoutLayers(for canvas: CGSize) {
+        // Guard against degenerate canvas sizes. ScreenSaverView can instantiate
+        // with NSRect.zero in preview-thumbnail or first-load paths; we skip
+        // layout until a real size arrives via `canvasDidChange`.
+        guard canvas.width > 0, canvas.height > 0 else { return }
+
         let center = CGPoint(x: canvas.width / 2, y: canvas.height / 2)
         let radius = min(canvas.width, canvas.height) * 0.4
 

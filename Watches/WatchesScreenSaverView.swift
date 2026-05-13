@@ -21,6 +21,12 @@ final class WatchesScreenSaverView: ScreenSaverView {
     private var displayLink: CADisplayLink?
     private var powerStateObserver: NSObjectProtocol?
 
+    /// Identity of the `CALayer` instance the renderer is currently attached to.
+    /// If AppKit recreates `self.layer` (display reconfiguration, pause/resume),
+    /// this reference stays pointing at the old (now-orphaned) layer and we
+    /// re-attach the renderer at the next `startAnimation`.
+    private weak var rendererAttachedTo: CALayer?
+
     // MARK: Lifecycle
 
     override init?(frame: NSRect, isPreview: Bool) {
@@ -55,6 +61,15 @@ final class WatchesScreenSaverView: ScreenSaverView {
 
     override func startAnimation() {
         super.startAnimation()
+
+        // Re-attach the renderer if the backing layer was replaced since init
+        // (display reconfiguration, screensaver pause/resume can swap self.layer).
+        if renderer == nil || rendererAttachedTo !== self.layer {
+            renderer?.detach()
+            renderer = nil
+            installRenderer()
+        }
+
         startDisplayLink()
         Logging.host.info("startAnimation: display link started")
     }
@@ -87,10 +102,18 @@ final class WatchesScreenSaverView: ScreenSaverView {
             return
         }
 
+        // Per P10: do not silently attach to a detached fallback CALayer.
+        // If the backing layer isn't allocated yet (e.g., view not in window),
+        // log and return; startAnimation will retry installation.
+        guard let hostLayer = self.layer else {
+            Logging.host.error("self.layer is nil at installRenderer time; deferring renderer attach to next startAnimation.")
+            return
+        }
+
         let dial = dialType.init()
-        let host = layer ?? CALayer()
-        dial.attach(rootLayer: host, canvas: bounds.size, timeSource: timeSource)
+        dial.attach(rootLayer: hostLayer, canvas: bounds.size, timeSource: timeSource)
         self.renderer = dial
+        self.rendererAttachedTo = hostLayer
 
         Logging.host.info("Installed renderer: \(dialType.identity.displayName, privacy: .public)")
     }
