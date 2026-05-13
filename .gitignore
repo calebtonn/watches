@@ -6,3 +6,16 @@
 
 # BMAD installer-managed user prefs (regenerated on each install)
 _bmad/config.user.toml
+
+# BMAD framework installer scaffolding (regeneratable; not product)
+_bmad/_config/
+_bmad/bmm/
+_bmad/core/
+_bmad/scripts/
+_bmad/config.toml
+
+# BMAD planning + implementation artifacts — tracked in private planning repo
+_bmad-output/
+
+# Developer-side reference imagery (homage source photos; legal posture + not product)
+faces/
