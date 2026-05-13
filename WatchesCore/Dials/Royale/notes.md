@@ -69,9 +69,10 @@ Inspired by the Casio AE-1200WH.
 
 - An hour hand and a minute hand (`CAShapeLayer` filled rectangles, rotated per tick via `setAffineTransform`)
 - A single short tick mark on the subdial's **outer ring** that JUMPS once per second (60 discrete angular positions; not a smooth-sweeping third hand)
-- Four short radial accent lines at the 12 / 3 / 6 / 9 positions, splitting the subdial face into visible quadrants
 
 The faceplate-printed decoration (ring + 60 tick marks + 12 numerals + 4 corner rivets) from Story 1.5 stays exactly as-is. The mini-clock is **additive LCD content**, not a replacement.
+
+**Quadrant accent lines were considered and removed.** An early implementation added four short radial accent lines at the 12/3/6/9 positions inside the subdial face. Removed post-render at Caleb's call: with the hands moving and the faceplate-printed numerology surrounding the cutout, the quadrant lines added visual noise without adding information. The clock reads cleanly with just hands + seconds tick + center hub.
 
 **Why.** Story 1.5's subdial was a static prop. Adding a functional analog readout (a) gives Royale a richer time presentation — the dial now displays time three ways simultaneously (big digital `HH:MM`, small digital `SS`, and analog hands), (b) exercises the `DialRenderer` protocol in a new way (paradigm mixing within a single dial — analog subcomponent inside a digital dial), and (c) confirms architecturally that the existing `attach`/`tick`/`canvasDidChange`/`detach` shape handles paradigm mixing without amendment.
 
