@@ -123,6 +123,54 @@ public enum RoyaleMath {
             .uppercased()
     }
 
+    // MARK: - Subdial analog readout (Story 1.5.2)
+    //
+    // Angles are returned in radians measured CLOCKWISE from the 12-o'clock
+    // position. The renderer is responsible for converting to Core Animation's
+    // counter-clockwise convention by negating the value when passing it to
+    // `CGAffineTransform(rotationAngle:)`.
+
+    /// Hour-hand rotation angle in radians, clockwise from 12. Accounts for
+    /// the minute fraction within the hour so the hand creeps smoothly toward
+    /// the next hour position (e.g. at 3:30 the hand points halfway between
+    /// the 3 and 4 positions).
+    public static func subdialHourAngle(
+        from date: Date,
+        calendar: Calendar
+    ) -> CGFloat {
+        let comps = calendar.dateComponents([.hour, .minute], from: date)
+        let h = comps.hour ?? 0
+        let m = comps.minute ?? 0
+        let hourPosition = CGFloat(h % 12) + CGFloat(m) / 60.0
+        return hourPosition * (.pi / 6.0)
+    }
+
+    /// Minute-hand rotation angle in radians, clockwise from 12. Accounts
+    /// for the seconds fraction within the minute so the hand creeps smoothly
+    /// toward the next minute.
+    public static func subdialMinuteAngle(
+        from date: Date,
+        calendar: Calendar
+    ) -> CGFloat {
+        let comps = calendar.dateComponents([.minute, .second], from: date)
+        let m = comps.minute ?? 0
+        let s = comps.second ?? 0
+        let minutePosition = CGFloat(m) + CGFloat(s) / 60.0
+        return minutePosition * (.pi / 30.0)
+    }
+
+    /// Integer second in `[0, 59]` used as a discrete tick index around the
+    /// subdial's outer ring. One-per-second JUMP semantics — no fractional
+    /// position. Matches the user direction "tick on outer ring, not a
+    /// sweeping seconds hand."
+    public static func subdialSecondTickIndex(
+        from date: Date,
+        calendar: Calendar
+    ) -> Int {
+        let comps = calendar.dateComponents([.second], from: date)
+        return comps.second ?? 0
+    }
+
     // MARK: - Alphabet bitmap (private)
 
     /// 5×7 pixel patterns for the Latin uppercase alphabet. `#` = on, `.` = off.

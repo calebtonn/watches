@@ -95,6 +95,22 @@ public final class RoyaleRenderer: DialRenderer {
     /// LCD content sublayers (BEHIND the faceplate, visible only through
     /// the faceplate's cutouts).
     private let subdialHubLayer = CAShapeLayer()   // sits on LCD, visible through subdial cutout
+
+    /// Functional analog mini-clock inside the subdial cutout (Story 1.5.2).
+    /// Hour + minute hands are CAShapeLayers whose `affineTransform` rotates
+    /// per tick. The seconds tick is a single short radial line that jumps
+    /// to one of 60 angular positions on each second boundary (NOT a smooth
+    /// sweeping hand). Quadrant accent lines are the four short radial
+    /// strokes at the 12/3/6/9 positions.
+    private let subdialQuadrants = CAShapeLayer()
+    private let subdialHourHand = CAShapeLayer()
+    private let subdialMinuteHand = CAShapeLayer()
+    private let subdialSecondTick = CAShapeLayer()
+    /// Last second index rendered for the seconds tick. Used by
+    /// `tick(reduceMotion:)` to freeze the tick when reduce-motion is on
+    /// (we still advance it once when transitioning from non-reduced).
+    private var lastRenderedSecondTickIndex: Int?
+
     private let mapLayer = CALayer()                // sits on LCD, visible through middle-right cutout
     private let mapContinentsLayer = CAShapeLayer()
     private let timeContainer = CALayer()           // sits on LCD, visible through bottom cutout
@@ -235,7 +251,35 @@ public final class RoyaleRenderer: DialRenderer {
             dayLetterSlots[i].set(letter: c)
         }
 
-        return [timeContainer.frame, secondaryContainer.frame]
+        // Subdial analog mini-clock (Story 1.5.2). RoyaleMath returns angles
+        // measured CLOCKWISE from 12-o'clock; CGAffineTransform's positive
+        // rotation is COUNTER-clockwise on macOS's y-up coords, so we negate.
+        let hourAngle = RoyaleMath.subdialHourAngle(from: now, calendar: calendar)
+        let minuteAngle = RoyaleMath.subdialMinuteAngle(from: now, calendar: calendar)
+        subdialHourHand.setAffineTransform(CGAffineTransform(rotationAngle: -hourAngle))
+        subdialMinuteHand.setAffineTransform(CGAffineTransform(rotationAngle: -minuteAngle))
+
+        // Seconds tick — only advances when reduce-motion is off. When on, the
+        // tick freezes at whatever index was current last; per AC7 the seconds
+        // readout is functionally silenced in reduce-motion mode.
+        if !reduceMotion {
+            let secondIndex = RoyaleMath.subdialSecondTickIndex(from: now, calendar: calendar)
+            if secondIndex != lastRenderedSecondTickIndex {
+                let secondAngle = CGFloat(secondIndex) * (2 * .pi / 60.0)
+                subdialSecondTick.setAffineTransform(
+                    CGAffineTransform(rotationAngle: -secondAngle)
+                )
+                lastRenderedSecondTickIndex = secondIndex
+            }
+        }
+
+        return [
+            timeContainer.frame,
+            secondaryContainer.frame,
+            subdialHourHand.frame,
+            subdialMinuteHand.frame,
+            subdialSecondTick.frame,
+        ]
     }
 
     public func canvasDidChange(to canvas: CGSize) {
@@ -373,6 +417,40 @@ public final class RoyaleRenderer: DialRenderer {
         subdialHubLayer.fillColor = RoyalePalette.litSegment
         subdialHubLayer.strokeColor = nil
         lcdLayer.addSublayer(subdialHubLayer)
+
+        // Functional analog mini-clock (Story 1.5.2). Z-order matters:
+        // quadrants → hour hand → minute hand → seconds tick (top so it's
+        // always visible against the hands). All sit on lcdLayer, visible
+        // through the subdial cutout in the faceplate above.
+        subdialQuadrants.name = "royale.subdial.quadrants"
+        subdialQuadrants.fillColor = nil
+        subdialQuadrants.strokeColor = RoyalePalette.litSegment
+        subdialQuadrants.lineCap = .butt
+        lcdLayer.addSublayer(subdialQuadrants)
+
+        subdialHourHand.name = "royale.subdial.hourHand"
+        subdialHourHand.fillColor = RoyalePalette.litSegment
+        subdialHourHand.strokeColor = nil
+        // Anchor at the BASE of the hand (its bottom-center) so rotation
+        // pivots around the subdial center, not the hand's own midpoint.
+        subdialHourHand.anchorPoint = CGPoint(x: 0.5, y: 0.0)
+        // Suppress implicit animations on transform changes.
+        subdialHourHand.actions = ["transform": NSNull(), "position": NSNull()]
+        lcdLayer.addSublayer(subdialHourHand)
+
+        subdialMinuteHand.name = "royale.subdial.minuteHand"
+        subdialMinuteHand.fillColor = RoyalePalette.litSegment
+        subdialMinuteHand.strokeColor = nil
+        subdialMinuteHand.anchorPoint = CGPoint(x: 0.5, y: 0.0)
+        subdialMinuteHand.actions = ["transform": NSNull(), "position": NSNull()]
+        lcdLayer.addSublayer(subdialMinuteHand)
+
+        subdialSecondTick.name = "royale.subdial.secondTick"
+        subdialSecondTick.fillColor = RoyalePalette.litSegment
+        subdialSecondTick.strokeColor = nil
+        subdialSecondTick.anchorPoint = CGPoint(x: 0.5, y: 0.0)
+        subdialSecondTick.actions = ["transform": NSNull(), "position": NSNull()]
+        lcdLayer.addSublayer(subdialSecondTick)
 
         // World map (rendered through the middle-right cutout).
         mapLayer.name = "royale.map"
@@ -701,6 +779,29 @@ public final class RoyaleRenderer: DialRenderer {
         return path
     }
 
+    /// Four short radial lines at the cardinal positions (12 / 3 / 6 / 9) of
+    /// the subdial — the "quadrant" accent lines. Drawn as a single combined
+    /// stroked path in LCD-local coordinates.
+    private static func subdialQuadrantsPath(
+        center: CGPoint,
+        inner: CGFloat,
+        outer: CGFloat
+    ) -> CGPath {
+        let path = CGMutablePath()
+        // y-up cardinal directions: 12=+y, 3=+x, 6=-y, 9=-x
+        let dirs: [(dx: CGFloat, dy: CGFloat)] = [
+            ( 0,  1),  // 12 o'clock
+            ( 1,  0),  //  3 o'clock
+            ( 0, -1),  //  6 o'clock
+            (-1,  0),  //  9 o'clock
+        ]
+        for (dx, dy) in dirs {
+            path.move(to: CGPoint(x: center.x + dx * inner, y: center.y + dy * inner))
+            path.addLine(to: CGPoint(x: center.x + dx * outer, y: center.y + dy * outer))
+        }
+        return path
+    }
+
     /// Subdial frame printed on the faceplate around the circular cutout:
     /// outer ring + 60 tick marks (12 long major + 48 short minor). The
     /// ring sits just outside the cutout; ticks span from the cutout edge
@@ -764,6 +865,67 @@ public final class RoyaleRenderer: DialRenderer {
             ellipseIn: CGRect(origin: .zero, size: subdialHubLayer.frame.size),
             transform: nil
         )
+
+        // Functional analog mini-clock inside the subdial cutout (Story 1.5.2).
+        // All four layers share the same anchor strategy:
+        //   - bounds = (width, length) with length running from the SUBDIAL
+        //     CENTER outward toward 12-o'clock
+        //   - anchorPoint = (0.5, 0.0) — bottom-center, which is the base of
+        //     the "hand"
+        //   - position = subdial center (LCD-local)
+        //   - default rotation (0) points the layer UP (12-o'clock visually)
+        //   - tick() rotates via `setAffineTransform` per the math angles
+        let cutoutR = cutouts.subdialRadius
+
+        // Hour hand — short and thick.
+        let hourLength = cutoutR * 0.55
+        let hourWidth = cutoutR * 0.11
+        subdialHourHand.bounds = CGRect(x: 0, y: 0, width: hourWidth, height: hourLength)
+        subdialHourHand.position = hubCenter
+        subdialHourHand.path = CGPath(
+            rect: CGRect(x: 0, y: 0, width: hourWidth, height: hourLength),
+            transform: nil
+        )
+
+        // Minute hand — longer and thinner.
+        let minuteLength = cutoutR * 0.80
+        let minuteWidth = cutoutR * 0.075
+        subdialMinuteHand.bounds = CGRect(x: 0, y: 0, width: minuteWidth, height: minuteLength)
+        subdialMinuteHand.position = hubCenter
+        subdialMinuteHand.path = CGPath(
+            rect: CGRect(x: 0, y: 0, width: minuteWidth, height: minuteLength),
+            transform: nil
+        )
+
+        // Seconds tick — a short rectangle near the outer ring. The layer
+        // extends from center to outer ring; only the tip portion is filled
+        // (the rest of the bounds is transparent path-less area).
+        let secondTickRing = cutoutR * 0.92
+        let secondTickLen = cutoutR * 0.14
+        let secondTickWidth = cutoutR * 0.07
+        subdialSecondTick.bounds = CGRect(x: 0, y: 0, width: secondTickWidth, height: secondTickRing)
+        subdialSecondTick.position = hubCenter
+        subdialSecondTick.path = CGPath(
+            rect: CGRect(
+                x: 0, y: secondTickRing - secondTickLen,
+                width: secondTickWidth, height: secondTickLen
+            ),
+            transform: nil
+        )
+
+        // Quadrant accent lines — 4 short radial bars at 12/3/6/9 positions.
+        // Drawn as a single path on a layer whose frame is the full lcdLayer
+        // bounds, so the path's coordinates are LCD-local.
+        subdialQuadrants.frame = lcdLayer.bounds
+        subdialQuadrants.path = Self.subdialQuadrantsPath(
+            center: hubCenter,
+            inner: cutoutR * 0.35,
+            outer: cutoutR * 0.48
+        )
+        subdialQuadrants.lineWidth = max(1, cutoutR * 0.05)
+
+        // Reset rotation cache so the next tick re-renders the seconds tick.
+        lastRenderedSecondTickIndex = nil
 
         // Map — fills the middle-right cutout area.
         let mapFrameLCD = toLCD(cutouts.middleRight)
