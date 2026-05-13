@@ -10,10 +10,10 @@ A macOS screensaver delivering six watch-face dials — five analog homages and 
 
 | Dial | Inspiration | Status |
 |---|---|---|
-| Asymmetric Moonphase | A. Lange & Söhne 1815 Annual Calendar | planned |
-| Diver | Tudor Black Bay 58 | planned |
-| Moonchrono | Omega Speedmaster Moonphase | planned |
-| Coke GMT | Rolex GMT-Master "Coke" | planned |
+| Asymmetric Moonphase | A. Lange & Söhne Lange 1 Moonphase | planned |
+| Diver | Rolex Submariner (tritium era, with aged "pumpkin" lume) | planned |
+| Moonchrono | Omega Speedmaster Moonwatch Professional | planned |
+| Coke GMT | Tudor Black Bay 58 GMT | planned |
 | Octagon | Audemars Piguet Royal Oak | planned |
 | Royale (digital easter egg) | Casio AE-1200WH | planned |
 
