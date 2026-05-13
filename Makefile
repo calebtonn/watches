@@ -5,7 +5,7 @@
 #   https://github.com/davenicoll/swiss-railway-clock-screensaver
 # Re-implemented for the Watches project.
 
-.PHONY: project build install-dev test clean
+.PHONY: project build install-dev test clean snapshot
 
 PRODUCT      := Watches
 BUNDLE       := $(PRODUCT).saver
@@ -44,6 +44,26 @@ test: project
 	           -scheme $(SCHEME) \
 	           -destination 'platform=macOS' \
 	           test
+
+# Render any registered dial offscreen to a PNG. Story 1.5 AC17.
+# DIAL/OUT/WIDTH/HEIGHT/DATE override defaults; e.g.
+#   make snapshot                                            # default: royale → snapshots/royale.png
+#   make snapshot DIAL=asymmetricMoonphase OUT=snapshots/moon.png
+#   make snapshot DIAL=royale WIDTH=1600 HEIGHT=1600 DATE=2026-05-13T12:34:56Z
+snapshot: project
+	xcodebuild -project $(PRODUCT).xcodeproj \
+	           -scheme DialSnapshot \
+	           -configuration Release \
+	           -derivedDataPath $(BUILD_DIR) \
+	           CODE_SIGN_IDENTITY="-" \
+	           build
+	@mkdir -p snapshots
+	$(BUILD_DIR)/Build/Products/Release/DialSnapshot \
+	  --dial   $(if $(DIAL),$(DIAL),royale) \
+	  --output $(if $(OUT),$(OUT),snapshots/$(if $(DIAL),$(DIAL),royale).png) \
+	  --width  $(if $(WIDTH),$(WIDTH),1200) \
+	  --height $(if $(HEIGHT),$(HEIGHT),1200) \
+	  $(if $(DATE),--date $(DATE),)
 
 # Remove generated build artifacts and the generated Xcode project.
 clean:

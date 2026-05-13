@@ -76,6 +76,23 @@ targets:
         LD_RUNPATH_SEARCH_PATHS:
           - "@loader_path/../Frameworks"
 
+  DialSnapshot:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Tools/DialSnapshot
+    dependencies:
+      - target: WatchesCore
+        embed: false
+        link: true
+    settings:
+      base:
+        PRODUCT_NAME: DialSnapshot
+        PRODUCT_BUNDLE_IDENTIFIER: com.calebtonn.DialSnapshot
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@executable_path"
+          - "@executable_path/../Frameworks"
+
   WatchesTests:
     type: bundle.unit-test
     platform: macOS
@@ -104,3 +121,9 @@ schemes:
     test:
       targets:
         - WatchesTests
+
+  DialSnapshot:
+    build:
+      targets:
+        WatchesCore: all
+        DialSnapshot: all

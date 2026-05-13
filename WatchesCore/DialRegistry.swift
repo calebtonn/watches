@@ -13,7 +13,7 @@ public enum DialRegistry {
     /// All registered dial types, in picker order (Story 3.1).
     public static let all: [DialRenderer.Type] = [
         ProofOfHostRenderer.self,
-        // Story 1.5: + RoyaleRenderer.self
+        RoyaleRenderer.self,
         // Story 1.6: + AsymmetricMoonphaseRenderer.self
         // Story 2.1: + CokeGMTRenderer.self
         // Story 2.2: + OctagonRenderer.self

@@ -33,3 +33,7 @@ Watches.xcodeproj/
 # DMG build output (lives in dist/, populated by Story 3.5)
 dist/
 
+# Per-dial snapshots produced by `make snapshot` — regeneratable artifacts.
+# Kept local-only; review reproduces by running the tool.
+snapshots/
+

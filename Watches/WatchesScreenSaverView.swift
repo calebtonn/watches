@@ -172,11 +172,12 @@ final class WatchesScreenSaverView: ScreenSaverView {
     // MARK: Renderer wiring
 
     private func installRenderer() {
-        // Story 1.2 hardcodes the proof-of-host dial.
-        // Story 3.1 will replace this with a `ScreenSaverDefaults` read,
-        // with fallback to a registered dial if the ID is unknown (P10).
-        guard let dialType = DialRegistry.byID("proofOfHost") else {
-            Logging.host.error("Default dial 'proofOfHost' not registered; rendering blank canvas.")
+        // Story 1.5 temporarily hardcodes Royale (the dial being stress-tested
+        // against the protocol). Story 1.6 swaps to "asymmetricMoonphase";
+        // Story 3.1 replaces this whole branch with a `ScreenSaverDefaults`
+        // read and a fallback to the first default-visibility dial (P10).
+        guard let dialType = DialRegistry.byID("royale") else {
+            Logging.host.error("Default dial 'royale' not registered; rendering blank canvas.")
             return
         }
 
