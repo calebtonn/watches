@@ -318,14 +318,54 @@ Hand-blade proportions also retuned: lozenge now occupies 40-90% of the
 forward length (was 50-92%) with the peak at the symmetric midpoint of
 the blade — larger, more prominent diamond near the tip.
 
+## Polish pass E — design-spec implementation (2026-05-13)
+
+Iterations weren't converging — I'd read images, get a detail wrong, fix it,
+miss another. To break the loop, I had a designer-style agent do a deep
+pass on all three reference photos in `faces/` and produce
+`design-spec.md` — a comprehensive Swift implementation specification with
+exact positions, sizes, colors, paths, lighting, z-order. Then I
+implemented from that spec in one shot rather than iterating on details.
+
+Key changes (full diff vs prior pass):
+
+1. **Palette overhaul** — exact sRGB triples for every color per the spec,
+   new entries: `caseGoldMid`, `caseInnerLip`, `dialFaceShadow`,
+   `moonFaceBronze`, `dateBoxInnerShadow`. Removed unused `dateSeparator`.
+2. **Slimmer bezel** — `dialRadius = caseRadius * 0.93` (was 0.88); 4-stop
+   gold gradient; engraved inner-lip stroke with semi-transparent dark.
+3. **Skeumorphic recess** — 4 layers per sub-dial: recess gradient
+   (vertical) + radial gloss (upper-left) + upper-rim shadow stroke with
+   downward CALayer shadow (simulates the lip blocking light) + lower-rim
+   highlight stroke masked to the bottom 40%. Same recipe for both sub-dials.
+4. **Hour markers** — slender vertical diamonds (long 0.085, wide 0.030,
+   at r·0.86 instead of r·0.92). Drop shadow retained.
+5. **Roman numerals** — Bodoni 72 Book (NOT bold) at radius 0.86 (was 0.82),
+   size 0.13 (was 0.16). Sit on the same circle as the lozenge markers.
+6. **Minute ticks** — thin hairlines (r·0.012), butt-capped, slightly
+   translucent near-black.
+7. **Hands** — shaft 18%, tail 55%, blade 42-92% of forward length with
+   peak at 66% (symmetric). No pivot eye on either hand. Drop shadows +
+   thin gold-shadow stroke for facet definition.
+8. **Center hub** — smaller (0.040 vs 0.05) with drop shadow.
+9. **Moonphase** — aperture height factor 0.58 (was 0.55); moon disc
+   `hh·0.72`; moon-face uses new `moonFaceBronze` for contrast; stars
+   repositioned per spec; aperture rim gains a drop shadow.
+10. **Big date** — corner radius 0.06, frame inset 0.045, gap 0.04. Removed
+    separator entirely. Inner-shadow stroke on white boxes. Frame drop shadow.
+11. **Sub-seconds** — full main-time recipe (recess, gloss, rim shadow,
+    lower-half highlight). Tick layers split into major + minor with
+    different line widths. Numerals at r·0.68. Hand = slim needle.
+12. **Power reserve** — span `π/2.4 ≈ 75°`, radius 0.32, major/minor split,
+    smaller red triangles (0.085 vs 0.10), smaller labels, smaller hand.
+
+The design spec at `design-spec.md` is the single source of truth going
+forward — any future visual change should update it first.
+
 ## Open follow-ups
 
-- Stars are very small and easy to miss at typical screensaver size. May
-  need to bump star outer radius further (currently `hw * 0.05`).
-- Man-in-the-moon detail is also subtle — could be more pronounced.
-- At certain moon phases (e.g., near new moon), only a thin sliver of moon
-  shows. Visually correct but may want a tiny opacity bump on the navy sky
-  decoration so the aperture doesn't feel empty.
-- Subtle concentric/sunburst texture on the main faceplate (not the matte
-  faceplate, but the *interior* of each sub-dial) — visible in the Lange
-  detail shots. Not yet implemented.
+- Faceplate stippling overlay (~6% alpha noise) not yet implemented; the
+  matte-with-no-specular treatment already reads as matte by contrast
+  against the polished sub-dials, but a real stipple texture would push
+  closer to photoreal.
+- Man-in-the-moon detail still subtle at typical screensaver zoom.

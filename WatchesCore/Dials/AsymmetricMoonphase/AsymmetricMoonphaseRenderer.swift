@@ -68,6 +68,8 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
     private let mainTimeRecessShade = CAGradientLayer()
     private let mainTimeGlossLayer = CAGradientLayer()    // polished-silver highlight
     private let mainTimeOuterRing = CAShapeLayer()
+    private let mainTimeRimUpperShadow = CAShapeLayer()   // dark crescent at the top of the well
+    private let mainTimeRimLowerHighlight = CAShapeLayer() // bounce-light at the bottom of the well
     private let mainTimeNumeralsLayer = CAShapeLayer()
     private let mainTimeTicksLayer = CAShapeLayer()
     private let mainTimeHourMarkersLayer = CAShapeLayer()   // gold lozenges at 1,2,4,5,7,8,10,11
@@ -100,7 +102,6 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
     private let bigDateBox2 = CAShapeLayer()
     private let bigDateDigit1Layer = CAShapeLayer()
     private let bigDateDigit2Layer = CAShapeLayer()
-    private let bigDateSeparator = CAShapeLayer()
     private var bigDateBox1Rect: CGRect = .zero
     private var bigDateBox2Rect: CGRect = .zero
     private var bigDateNumeralFont: NSFont?
@@ -110,14 +111,18 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
     private let subSecondsFaceLayer = CAShapeLayer()
     private let subSecondsRecessShade = CAGradientLayer()
     private let subSecondsGlossLayer = CAGradientLayer()    // polished-silver highlight
+    private let subSecondsRimUpperShadow = CAShapeLayer()
+    private let subSecondsRimLowerHighlight = CAShapeLayer()
     private let subSecondsNumeralsLayer = CAShapeLayer()
-    private let subSecondsTicksLayer = CAShapeLayer()
+    private let subSecondsTicksLayer = CAShapeLayer()       // minor ticks
+    private let subSecondsTicksMajorLayer = CAShapeLayer()  // 5-second majors
     private let subSecondsHand = CAShapeLayer()
     private let subSecondsHub = CAShapeLayer()
 
     // MARK: Power reserve indicator layers
 
-    private let powerReserveArcLayer = CAShapeLayer()
+    private let powerReserveArcLayer = CAShapeLayer()         // minor ticks
+    private let powerReserveTicksMajorLayer = CAShapeLayer()  // major ticks at AUF / midpoint / AB
     private let powerReserveLabelsLayer = CAShapeLayer()
     private let powerReserveRedTrianglesLayer = CAShapeLayer()
     private let powerReserveIndicatorHand = CAShapeLayer()
@@ -265,30 +270,32 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         vignetteLayer.endPoint = CGPoint(x: 1.0, y: 1.0)
         caseBackgroundLayer.addSublayer(vignetteLayer)
 
-        // Gold bezel — vertical gradient with subtle diagonal tilt.
+        // Gold bezel — 4-stop vertical gradient, nearly vertical with a
+        // slight tilt that matches the upper-left light.
         bezelLayer.name = "asymmetric.bezel"
         bezelLayer.colors = [
             AsymmetricMoonphasePalette.caseGoldHighlight,
+            AsymmetricMoonphasePalette.caseGoldMid,
             AsymmetricMoonphasePalette.caseGold,
             AsymmetricMoonphasePalette.caseGoldShadow,
         ]
-        bezelLayer.locations = [0.0, 0.55, 1.0]
-        bezelLayer.startPoint = CGPoint(x: 0.25, y: 1.0)
-        bezelLayer.endPoint = CGPoint(x: 0.75, y: 0.0)
+        bezelLayer.locations = [0.00, 0.30, 0.62, 1.00]
+        bezelLayer.startPoint = CGPoint(x: 0.30, y: 1.0)
+        bezelLayer.endPoint = CGPoint(x: 0.70, y: 0.0)
         bezelMaskShape.fillColor = NSColor.white.cgColor
         bezelLayer.mask = bezelMaskShape
         caseBackgroundLayer.addSublayer(bezelLayer)
 
-        // Outer rim light (thin bright stroke).
+        // Outer rim light (thin bright stroke at the very outer edge).
         bezelRimLight.name = "asymmetric.bezel.rim"
         bezelRimLight.fillColor = nil
         bezelRimLight.strokeColor = AsymmetricMoonphasePalette.caseRim
         caseBackgroundLayer.addSublayer(bezelRimLight)
 
-        // Inner shadow stroke at the bezel/dial boundary.
+        // Engraved inner lip where bezel meets dial face.
         bezelInnerShadow.name = "asymmetric.bezel.innerShadow"
         bezelInnerShadow.fillColor = nil
-        bezelInnerShadow.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        bezelInnerShadow.strokeColor = AsymmetricMoonphasePalette.caseInnerLip
         caseBackgroundLayer.addSublayer(bezelInnerShadow)
 
         // Dial face — silver circle.
@@ -302,35 +309,45 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         mainTimeFaceLayer.strokeColor = nil
         caseBackgroundLayer.addSublayer(mainTimeFaceLayer)
 
-        // Recess shade — subtle dark-at-top / light-at-bottom overlay clipped
-        // to the sub-dial face. Sells the "this dial is sunken into the plate"
-        // skeuomorphic effect without any gold rim. Intensity reduced so the
-        // gloss highlight (added next) can read clearly.
+        // Recess depth gradient — vertical: dark at top of well, bright bounce
+        // at bottom of well. Softened so the gloss highlight reads cleanly.
         mainTimeRecessShade.startPoint = CGPoint(x: 0.5, y: 1.0)
         mainTimeRecessShade.endPoint = CGPoint(x: 0.5, y: 0.0)
         mainTimeRecessShade.colors = [
-            NSColor(white: 0.0, alpha: 0.20).cgColor,
-            NSColor(white: 0.0, alpha: 0.02).cgColor,
-            NSColor(white: 1.0, alpha: 0.10).cgColor,
+            NSColor(white: 0.0, alpha: 0.13).cgColor,
+            NSColor(white: 0.0, alpha: 0.00).cgColor,
+            NSColor(white: 1.0, alpha: 0.06).cgColor,
         ]
         mainTimeRecessShade.locations = [0.0, 0.55, 1.0]
         caseBackgroundLayer.addSublayer(mainTimeRecessShade)
 
-        // Gloss highlight — radial bright spot at upper-left, fading outward.
-        // Sells "polished silver" finish (matte faceplate vs. glossy sub-dials).
+        // Polished-silver radial gloss — subtle highlight at upper-left.
         mainTimeGlossLayer.type = .radial
-        mainTimeGlossLayer.startPoint = CGPoint(x: 0.30, y: 0.78)
-        mainTimeGlossLayer.endPoint = CGPoint(x: 1.00, y: 0.20)
+        mainTimeGlossLayer.startPoint = CGPoint(x: 0.32, y: 0.78)
+        mainTimeGlossLayer.endPoint = CGPoint(x: 0.95, y: 0.20)
         mainTimeGlossLayer.colors = [
-            NSColor(white: 1.0, alpha: 0.45).cgColor,
-            NSColor(white: 1.0, alpha: 0.12).cgColor,
+            NSColor(white: 1.0, alpha: 0.18).cgColor,
+            NSColor(white: 1.0, alpha: 0.06).cgColor,
             NSColor(white: 1.0, alpha: 0.00).cgColor,
         ]
         mainTimeGlossLayer.locations = [0.0, 0.45, 1.0]
         caseBackgroundLayer.addSublayer(mainTimeGlossLayer)
 
-        // Inner-boundary shadow ring (replaces gold ring) — dark thin stroke
-        // just inside the face perimeter to define the recessed edge.
+        // Upper-rim shadow — the dark crescent at the top of the recess,
+        // simulating the lip blocking the light from above.
+        mainTimeRimUpperShadow.fillColor = nil
+        mainTimeRimUpperShadow.strokeColor = AsymmetricMoonphasePalette.subDialShadow
+        mainTimeRimUpperShadow.shadowColor = NSColor.black.cgColor
+        mainTimeRimUpperShadow.shadowOpacity = 0.6
+        caseBackgroundLayer.addSublayer(mainTimeRimUpperShadow)
+
+        // Lower-rim highlight — faint warm bounce-light along the bottom of
+        // the recess. Masked to the lower half so it reads as a moon.
+        mainTimeRimLowerHighlight.fillColor = nil
+        mainTimeRimLowerHighlight.strokeColor = NSColor(white: 1.0, alpha: 0.45).cgColor
+        caseBackgroundLayer.addSublayer(mainTimeRimLowerHighlight)
+
+        // Engraved perimeter line.
         mainTimeOuterRing.fillColor = nil
         mainTimeOuterRing.strokeColor = AsymmetricMoonphasePalette.subDialShadow
         caseBackgroundLayer.addSublayer(mainTimeOuterRing)
@@ -381,74 +398,103 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         // Man-in-the-moon: two eye dots (filled) + curved smile (stroked).
         // Parented to moving layer so it slides with the moon disc.
         moonphaseMovingLayer.addSublayer(moonphaseFaceLayer)
-        moonphaseFaceLayer.fillColor = AsymmetricMoonphasePalette.caseGoldShadow
-        moonphaseFaceLayer.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        moonphaseFaceLayer.fillColor = AsymmetricMoonphasePalette.moonFaceBronze
+        moonphaseFaceLayer.strokeColor = AsymmetricMoonphasePalette.moonFaceBronze
         moonphaseFaceLayer.lineCap = .round
         caseBackgroundLayer.addSublayer(moonphaseDiscContainer)
 
-        // Thin gold frame around the aperture perimeter.
+        // Thin gold frame around the aperture perimeter with subtle drop
+        // shadow so it reads as an applied gold ring.
         moonphaseFrameLayer.fillColor = nil
         moonphaseFrameLayer.strokeColor = AsymmetricMoonphasePalette.handGold
+        moonphaseFrameLayer.shadowColor = NSColor.black.cgColor
+        moonphaseFrameLayer.shadowOpacity = 0.50
+        moonphaseFrameLayer.shadowOffset = CGSize(width: 0.6, height: -0.6)
+        moonphaseFrameLayer.shadowRadius = 1.0
         caseBackgroundLayer.addSublayer(moonphaseFrameLayer)
 
-        // Hands — anchor at bottom-center, rotation pivots at sub-dial center.
+        // Hands — anchor at the PIVOT (tail extends behind in layer bounds).
+        // Drop shadow gives them the "above the dial" feel; thin dark stroke
+        // gives a faceted-edge cue on the gold.
         mainTimeHourHand.fillColor = AsymmetricMoonphasePalette.handGold
-        mainTimeHourHand.strokeColor = nil
-        mainTimeHourHand.fillRule = .evenOdd       // for the blade lozenge hole
+        mainTimeHourHand.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        mainTimeHourHand.lineWidth = 0.4
         mainTimeHourHand.anchorPoint = CGPoint(x: 0.5, y: 0.0)
         mainTimeHourHand.actions = ["transform": NSNull(), "position": NSNull()]
+        mainTimeHourHand.shadowColor = NSColor.black.cgColor
+        mainTimeHourHand.shadowOpacity = 0.40
+        mainTimeHourHand.shadowOffset = CGSize(width: 1.2, height: -1.8)
+        mainTimeHourHand.shadowRadius = 2.5
         caseBackgroundLayer.addSublayer(mainTimeHourHand)
 
         mainTimeMinuteHand.fillColor = AsymmetricMoonphasePalette.handGold
-        mainTimeMinuteHand.strokeColor = nil
-        mainTimeMinuteHand.fillRule = .evenOdd       // for the pivot hole
+        mainTimeMinuteHand.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        mainTimeMinuteHand.lineWidth = 0.4
         mainTimeMinuteHand.anchorPoint = CGPoint(x: 0.5, y: 0.0)
         mainTimeMinuteHand.actions = ["transform": NSNull(), "position": NSNull()]
+        mainTimeMinuteHand.shadowColor = NSColor.black.cgColor
+        mainTimeMinuteHand.shadowOpacity = 0.40
+        mainTimeMinuteHand.shadowOffset = CGSize(width: 1.2, height: -1.8)
+        mainTimeMinuteHand.shadowRadius = 2.5
         caseBackgroundLayer.addSublayer(mainTimeMinuteHand)
 
         mainTimeCenterHub.fillColor = AsymmetricMoonphasePalette.handGold
-        mainTimeCenterHub.strokeColor = nil
+        mainTimeCenterHub.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        mainTimeCenterHub.lineWidth = 0.4
+        mainTimeCenterHub.shadowColor = NSColor.black.cgColor
+        mainTimeCenterHub.shadowOpacity = 0.45
+        mainTimeCenterHub.shadowOffset = CGSize(width: 0.5, height: -0.6)
+        mainTimeCenterHub.shadowRadius = 1.0
         caseBackgroundLayer.addSublayer(mainTimeCenterHub)
 
-        // Big date — gold frame BEHIND, then white inner box, then digits.
+        // Big date — gold frame BEHIND with drop shadow, white inner box with
+        // thin inner-edge stroke, digits with drop shadow. No separator (the
+        // gap + the two frame edges already separate the digits).
         bigDateGoldFrame1.fillColor = AsymmetricMoonphasePalette.handGold
         bigDateGoldFrame1.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        bigDateGoldFrame1.shadowColor = NSColor.black.cgColor
+        bigDateGoldFrame1.shadowOpacity = 0.50
+        bigDateGoldFrame1.shadowOffset = CGSize(width: 0.8, height: -1.2)
+        bigDateGoldFrame1.shadowRadius = 1.6
         caseBackgroundLayer.addSublayer(bigDateGoldFrame1)
 
         bigDateGoldFrame2.fillColor = AsymmetricMoonphasePalette.handGold
         bigDateGoldFrame2.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        bigDateGoldFrame2.shadowColor = NSColor.black.cgColor
+        bigDateGoldFrame2.shadowOpacity = 0.50
+        bigDateGoldFrame2.shadowOffset = CGSize(width: 0.8, height: -1.2)
+        bigDateGoldFrame2.shadowRadius = 1.6
         caseBackgroundLayer.addSublayer(bigDateGoldFrame2)
 
         bigDateBox1.fillColor = AsymmetricMoonphasePalette.dateBackground
-        bigDateBox1.strokeColor = nil
+        bigDateBox1.strokeColor = AsymmetricMoonphasePalette.dateBoxInnerShadow
+        bigDateBox1.lineWidth = 0.5
         caseBackgroundLayer.addSublayer(bigDateBox1)
 
         bigDateBox2.fillColor = AsymmetricMoonphasePalette.dateBackground
-        bigDateBox2.strokeColor = nil
+        bigDateBox2.strokeColor = AsymmetricMoonphasePalette.dateBoxInnerShadow
+        bigDateBox2.lineWidth = 0.5
         caseBackgroundLayer.addSublayer(bigDateBox2)
 
-        bigDateSeparator.fillColor = AsymmetricMoonphasePalette.dateSeparator
-        bigDateSeparator.strokeColor = nil
-        caseBackgroundLayer.addSublayer(bigDateSeparator)
-
-        // Drop shadow on the digits so they sit physically on the white plate.
+        // Digit drop shadow — the printed numerals sit physically on the
+        // white plate beneath the gold frame.
         bigDateDigit1Layer.fillColor = AsymmetricMoonphasePalette.dateNumeral
         bigDateDigit1Layer.strokeColor = nil
         bigDateDigit1Layer.shadowColor = NSColor.black.cgColor
-        bigDateDigit1Layer.shadowOpacity = 0.35
-        bigDateDigit1Layer.shadowOffset = CGSize(width: 0.6, height: -1.0)
-        bigDateDigit1Layer.shadowRadius = 1.2
+        bigDateDigit1Layer.shadowOpacity = 0.30
+        bigDateDigit1Layer.shadowOffset = CGSize(width: 0.5, height: -0.8)
+        bigDateDigit1Layer.shadowRadius = 0.8
         caseBackgroundLayer.addSublayer(bigDateDigit1Layer)
 
         bigDateDigit2Layer.fillColor = AsymmetricMoonphasePalette.dateNumeral
         bigDateDigit2Layer.strokeColor = nil
         bigDateDigit2Layer.shadowColor = NSColor.black.cgColor
-        bigDateDigit2Layer.shadowOpacity = 0.35
-        bigDateDigit2Layer.shadowOffset = CGSize(width: 0.6, height: -1.0)
-        bigDateDigit2Layer.shadowRadius = 1.2
+        bigDateDigit2Layer.shadowOpacity = 0.30
+        bigDateDigit2Layer.shadowOffset = CGSize(width: 0.5, height: -0.8)
+        bigDateDigit2Layer.shadowRadius = 0.8
         caseBackgroundLayer.addSublayer(bigDateDigit2Layer)
 
-        // Sub-seconds — same recess treatment as main time.
+        // Sub-seconds — same recess + gloss recipe as main time, scaled down.
         subSecondsFaceLayer.fillColor = AsymmetricMoonphasePalette.subDialFace
         subSecondsFaceLayer.strokeColor = AsymmetricMoonphasePalette.subDialShadow
         caseBackgroundLayer.addSublayer(subSecondsFaceLayer)
@@ -456,45 +502,76 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         subSecondsRecessShade.startPoint = CGPoint(x: 0.5, y: 1.0)
         subSecondsRecessShade.endPoint = CGPoint(x: 0.5, y: 0.0)
         subSecondsRecessShade.colors = [
-            NSColor(white: 0.0, alpha: 0.20).cgColor,
-            NSColor(white: 0.0, alpha: 0.02).cgColor,
-            NSColor(white: 1.0, alpha: 0.10).cgColor,
+            NSColor(white: 0.0, alpha: 0.13).cgColor,
+            NSColor(white: 0.0, alpha: 0.00).cgColor,
+            NSColor(white: 1.0, alpha: 0.06).cgColor,
         ]
         subSecondsRecessShade.locations = [0.0, 0.55, 1.0]
         caseBackgroundLayer.addSublayer(subSecondsRecessShade)
 
         subSecondsGlossLayer.type = .radial
-        subSecondsGlossLayer.startPoint = CGPoint(x: 0.30, y: 0.78)
-        subSecondsGlossLayer.endPoint = CGPoint(x: 1.00, y: 0.20)
+        subSecondsGlossLayer.startPoint = CGPoint(x: 0.32, y: 0.78)
+        subSecondsGlossLayer.endPoint = CGPoint(x: 0.95, y: 0.20)
         subSecondsGlossLayer.colors = [
-            NSColor(white: 1.0, alpha: 0.45).cgColor,
-            NSColor(white: 1.0, alpha: 0.12).cgColor,
+            NSColor(white: 1.0, alpha: 0.18).cgColor,
+            NSColor(white: 1.0, alpha: 0.06).cgColor,
             NSColor(white: 1.0, alpha: 0.00).cgColor,
         ]
         subSecondsGlossLayer.locations = [0.0, 0.45, 1.0]
         caseBackgroundLayer.addSublayer(subSecondsGlossLayer)
 
+        subSecondsRimUpperShadow.fillColor = nil
+        subSecondsRimUpperShadow.strokeColor = AsymmetricMoonphasePalette.subDialShadow
+        subSecondsRimUpperShadow.shadowColor = NSColor.black.cgColor
+        subSecondsRimUpperShadow.shadowOpacity = 0.6
+        caseBackgroundLayer.addSublayer(subSecondsRimUpperShadow)
+
+        subSecondsRimLowerHighlight.fillColor = nil
+        subSecondsRimLowerHighlight.strokeColor = NSColor(white: 1.0, alpha: 0.45).cgColor
+        caseBackgroundLayer.addSublayer(subSecondsRimLowerHighlight)
+
+        // Minor minute ticks (every minute except multiples of 5).
         subSecondsTicksLayer.fillColor = nil
         subSecondsTicksLayer.strokeColor = AsymmetricMoonphasePalette.subDialNumeral
         caseBackgroundLayer.addSublayer(subSecondsTicksLayer)
+
+        // Major 5-second ticks (longer, thicker).
+        subSecondsTicksMajorLayer.fillColor = nil
+        subSecondsTicksMajorLayer.strokeColor = AsymmetricMoonphasePalette.subDialNumeral
+        caseBackgroundLayer.addSublayer(subSecondsTicksMajorLayer)
 
         subSecondsNumeralsLayer.fillColor = AsymmetricMoonphasePalette.subDialNumeral
         subSecondsNumeralsLayer.strokeColor = nil
         caseBackgroundLayer.addSublayer(subSecondsNumeralsLayer)
 
         subSecondsHand.fillColor = AsymmetricMoonphasePalette.handGold
-        subSecondsHand.strokeColor = nil
+        subSecondsHand.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        subSecondsHand.lineWidth = 0.3
         subSecondsHand.anchorPoint = CGPoint(x: 0.5, y: 0.0)
         subSecondsHand.actions = ["transform": NSNull(), "position": NSNull()]
+        subSecondsHand.shadowColor = NSColor.black.cgColor
+        subSecondsHand.shadowOpacity = 0.35
+        subSecondsHand.shadowOffset = CGSize(width: 0.6, height: -0.8)
+        subSecondsHand.shadowRadius = 1.0
         caseBackgroundLayer.addSublayer(subSecondsHand)
 
         subSecondsHub.fillColor = AsymmetricMoonphasePalette.handGold
+        subSecondsHub.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        subSecondsHub.lineWidth = 0.4
+        subSecondsHub.shadowColor = NSColor.black.cgColor
+        subSecondsHub.shadowOpacity = 0.45
+        subSecondsHub.shadowOffset = CGSize(width: 0.5, height: -0.6)
+        subSecondsHub.shadowRadius = 1.0
         caseBackgroundLayer.addSublayer(subSecondsHub)
 
-        // Power reserve
+        // Power reserve — minor ticks (light/thin) below major ticks (dark/thicker).
         powerReserveArcLayer.fillColor = nil
         powerReserveArcLayer.strokeColor = AsymmetricMoonphasePalette.powerReserveTrack
         caseBackgroundLayer.addSublayer(powerReserveArcLayer)
+
+        powerReserveTicksMajorLayer.fillColor = nil
+        powerReserveTicksMajorLayer.strokeColor = AsymmetricMoonphasePalette.subDialNumeral
+        caseBackgroundLayer.addSublayer(powerReserveTicksMajorLayer)
 
         powerReserveRedTrianglesLayer.fillColor = AsymmetricMoonphasePalette.powerReserveRed
         powerReserveRedTrianglesLayer.strokeColor = nil
@@ -505,10 +582,14 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         caseBackgroundLayer.addSublayer(powerReserveLabelsLayer)
 
         powerReserveIndicatorHand.fillColor = AsymmetricMoonphasePalette.handGold
-        powerReserveIndicatorHand.strokeColor = nil
-        powerReserveIndicatorHand.fillRule = .evenOdd       // blade lozenge hole
+        powerReserveIndicatorHand.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        powerReserveIndicatorHand.lineWidth = 0.3
         powerReserveIndicatorHand.anchorPoint = CGPoint(x: 0.5, y: 0.0)
         powerReserveIndicatorHand.actions = ["transform": NSNull(), "position": NSNull()]
+        powerReserveIndicatorHand.shadowColor = NSColor.black.cgColor
+        powerReserveIndicatorHand.shadowOpacity = 0.40
+        powerReserveIndicatorHand.shadowOffset = CGSize(width: 0.8, height: -1.0)
+        powerReserveIndicatorHand.shadowRadius = 1.5
         caseBackgroundLayer.addSublayer(powerReserveIndicatorHand)
     }
 
@@ -543,8 +624,9 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         bezelRimLight.path = CGPath(ellipseIn: caseRect, transform: nil)
         bezelRimLight.lineWidth = max(0.5, caseRadius * 0.005)
 
-        // Dial — inner circle at ~88% of case radius (bezel thickness = 12%).
-        let dialRadius = caseRadius * 0.88
+        // Dial — inner circle at ~93% of case radius (bezel thickness ≈ 7%,
+        // matching the Lange 1's slim bezel).
+        let dialRadius = caseRadius * 0.93
         let dialRect = CGRect(
             x: caseCenter.x - dialRadius,
             y: caseCenter.y - dialRadius,
@@ -558,51 +640,47 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         bezelInnerShadow.path = CGPath(ellipseIn: dialRect, transform: nil)
         bezelInnerShadow.lineWidth = max(0.5, caseRadius * 0.006)
 
-        // Per-readout anchors (canvas-coords). Pass C — mirror reference
-        // proportions. Main time grown to dominate the left half; big date
-        // and sub-seconds pulled left into a center-right column; power
-        // reserve enlarged at the right edge.
+        // Per-readout anchors (canvas-coords). Pass E — mirror the design
+        // spec values produced from side-by-side reference analysis.
         let mainTimeCenter = CGPoint(
-            x: caseCenter.x - dialRadius * 0.13,
-            y: caseCenter.y - dialRadius * 0.05
+            x: caseCenter.x - dialRadius * 0.18,
+            y: caseCenter.y + dialRadius * 0.00
         )
-        let mainTimeRadius = dialRadius * 0.50
+        let mainTimeRadius = dialRadius * 0.55
 
         // Moonphase aperture inside main time sub-dial. `moonphaseCenter` is
-        // the BASELINE-center of the aperture; the top is a *wide oval* —
-        // height ≈ 0.55 × half-width — traced with cubic Beziers (not an
-        // addArc semicircle).
+        // the BASELINE-center of the aperture; top is a wide horizontal oval
+        // (cubic Beziers; height = halfWidth × 0.58).
         let moonphaseCenter = CGPoint(
             x: mainTimeCenter.x,
-            y: mainTimeCenter.y + mainTimeRadius * 0.34
+            y: mainTimeCenter.y + mainTimeRadius * 0.36
         )
-        let moonphaseHalfWidth = mainTimeRadius * 0.34
-        let moonphaseHalfHeight = moonphaseHalfWidth * 0.55   // wide oval, h<w
+        let moonphaseHalfWidth = mainTimeRadius * 0.36
+        let moonphaseHalfHeight = moonphaseHalfWidth * 0.58   // wide oval, h<w
 
-        // Big date — upper center-right. Positioned so the box clears the
-        // main time outer ring at the top-right (allowing slight overlap
-        // with main time's silver face, like the reference).
+        // Big date — upper center-right. Sits at the top-right corner with
+        // its frames partially overlapping main time's silver face per the
+        // reference. Drop shadow on frames sells "applied gold".
         let bigDateCenter = CGPoint(
-            x: caseCenter.x + dialRadius * 0.22,
-            y: caseCenter.y + dialRadius * 0.45
-        )
-        let bigDateHeight = dialRadius * 0.16
-
-        // Sub-seconds — lower center-right, partially overlapping main time
-        // at the upper-left edge (like the reference).
-        let subSecondsCenter = CGPoint(
             x: caseCenter.x + dialRadius * 0.30,
-            y: caseCenter.y - dialRadius * 0.45
+            y: caseCenter.y + dialRadius * 0.42
         )
-        let subSecondsRadius = dialRadius * 0.20
+        let bigDateHeight = dialRadius * 0.17
 
-        // Power reserve — right edge, larger arc for the tall-vertical Lange
-        // power-reserve feel.
-        let powerReserveCenter = CGPoint(
-            x: caseCenter.x + dialRadius * 0.55,
-            y: caseCenter.y - dialRadius * 0.08
+        // Sub-seconds — lower center-right, partially overlapping main time.
+        let subSecondsCenter = CGPoint(
+            x: caseCenter.x + dialRadius * 0.32,
+            y: caseCenter.y - dialRadius * 0.40
         )
-        let powerReserveRadius = dialRadius * 0.30
+        let subSecondsRadius = dialRadius * 0.22
+
+        // Power reserve — right edge, larger arc, tighter angular span for
+        // the Lange's tall-vertical scale feel.
+        let powerReserveCenter = CGPoint(
+            x: caseCenter.x + dialRadius * 0.62,
+            y: caseCenter.y - dialRadius * 0.05
+        )
+        let powerReserveRadius = dialRadius * 0.32
 
         anchors = LayoutAnchors(
             caseCenter: caseCenter,
@@ -661,17 +739,40 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         glossMask.fillColor = NSColor.white.cgColor
         mainTimeGlossLayer.mask = glossMask
 
-        // Inner-boundary shadow stroke (replaces the old gold ring).
-        mainTimeOuterRing.frame = CGRect(origin: .zero, size: canvas)
-        mainTimeOuterRing.path = CGPath(ellipseIn: faceRect, transform: nil)
-        mainTimeOuterRing.lineWidth = max(0.5, r * 0.012)
+        // Upper-rim shadow — full-circle stroke with a downward-blurred shadow
+        // that simulates the lip blocking light from above.
+        let faceCirclePathCanvas = CGPath(ellipseIn: faceRect, transform: nil)
+        mainTimeRimUpperShadow.frame = CGRect(origin: .zero, size: canvas)
+        mainTimeRimUpperShadow.path = faceCirclePathCanvas
+        mainTimeRimUpperShadow.lineWidth = max(0.6, r * 0.020)
+        mainTimeRimUpperShadow.shadowOffset = CGSize(width: 0, height: -r * 0.010)
+        mainTimeRimUpperShadow.shadowRadius = r * 0.010
+        mainTimeRimUpperShadow.shadowPath = faceCirclePathCanvas
 
-        // Hour tick marks are REPLACED at non-cardinals by gold lozenges
-        // (built below in markersPath). Only the minute ticks live in this
-        // layer — small lines around the perimeter, skipping multiples of 5.
+        // Lower-rim highlight — mask the full-circle stroke to only show in
+        // the lower 40% of the face so it reads as a moon, not a full ring.
+        mainTimeRimLowerHighlight.frame = CGRect(origin: .zero, size: canvas)
+        mainTimeRimLowerHighlight.path = faceCirclePathCanvas
+        mainTimeRimLowerHighlight.lineWidth = max(0.4, r * 0.012)
+        let lowerHalfMask = CAShapeLayer()
+        lowerHalfMask.path = CGPath(rect: CGRect(
+            x: faceRect.minX, y: faceRect.minY,
+            width: faceRect.width, height: faceRect.height * 0.40
+        ), transform: nil)
+        lowerHalfMask.fillColor = NSColor.white.cgColor
+        mainTimeRimLowerHighlight.mask = lowerHalfMask
+
+        // Engraved perimeter line.
+        mainTimeOuterRing.frame = CGRect(origin: .zero, size: canvas)
+        mainTimeOuterRing.path = faceCirclePathCanvas
+        mainTimeOuterRing.lineWidth = max(0.5, r * 0.010)
+
+        // Minute ticks — 60 thin hairlines around the perimeter, skipping
+        // the 12 hour-marker positions (Romans at cardinals + lozenges at
+        // non-cardinals). Crisp printed look: thin, butt-capped, near-black.
         let ticksPath = CGMutablePath()
-        let minuteTickR = r * 0.99
-        let minuteTickInner = r * 0.95
+        let minuteTickR = r * 0.985
+        let minuteTickInner = r * 0.955
         for i in 0..<60 where i % 5 != 0 {
             let theta = .pi / 2 - (CGFloat(i) / 60) * 2 * .pi
             let dx = cos(theta)
@@ -681,16 +782,17 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         }
         mainTimeTicksLayer.frame = CGRect(origin: .zero, size: canvas)
         mainTimeTicksLayer.path = ticksPath
-        mainTimeTicksLayer.lineWidth = max(0.5, r * 0.020)
-        mainTimeTicksLayer.lineCap = .round
+        mainTimeTicksLayer.lineWidth = max(0.4, r * 0.012)
+        mainTimeTicksLayer.lineCap = .butt
 
         // Gold lozenge hour markers at the 8 non-cardinal positions
-        // (1, 2, 4, 5, 7, 8, 10, 11). Each is a 4-sided diamond pointing
-        // radially outward from the sub-dial center.
+        // (1, 2, 4, 5, 7, 8, 10, 11). Slim vertical diamonds (~2.8:1
+        // length:width) pointing radially outward, sharing radius with the
+        // Roman numerals (r·0.86).
         let markersPath = CGMutablePath()
-        let markerCenterR = r * 0.92        // distance from sub-dial center
-        let markerLong = r * 0.08           // radial length of the lozenge
-        let markerWide = r * 0.030          // perpendicular width of the lozenge
+        let markerCenterR = r * 0.86
+        let markerLong = r * 0.085          // radial length
+        let markerWide = r * 0.030          // perpendicular width
         let nonCardinals = [1, 2, 4, 5, 7, 8, 10, 11]
         for i in nonCardinals {
             let theta = .pi / 2 - (CGFloat(i) / 12) * 2 * .pi
@@ -712,11 +814,10 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         mainTimeHourMarkersLayer.frame = CGRect(origin: .zero, size: canvas)
         mainTimeHourMarkersLayer.path = markersPath
         mainTimeHourMarkersLayer.shadowPath = markersPath
-        mainTimeHourMarkersLayer.lineWidth = max(0.3, r * 0.004)
+        mainTimeHourMarkersLayer.lineWidth = max(0.3, r * 0.0035)
 
-        // Roman numerals at 12 / 3 / 6 / 9 — drawn via Core Text glyph paths
-        // for crisp serif rendering. (Sub-dial Roman numerals are a Lange 1
-        // signature; they're black, serif, slightly larger than the ticks.)
+        // Roman numerals at 12 / 3 / 6 / 9 — applied gold (Book/Regular
+        // weight serif). Same radius as the lozenges.
         let romans = ["XII", "III", "VI", "IX"]
         let romanAngles: [CGFloat] = [
             .pi / 2,     // 12 (top)
@@ -724,9 +825,9 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
             -.pi / 2,    // 6 (bottom)
             .pi,         // 9 (left)
         ]
-        let romanRadius = r * 0.82
-        let romanFontSize = r * 0.16
-        let romanFont = serifFont(size: romanFontSize, bold: false)
+        let romanRadius = r * 0.86
+        let romanFontSize = r * 0.13
+        let romanFont = romanNumeralFont(size: romanFontSize)
         let romansPath = CGMutablePath()
         for (i, roman) in romans.enumerated() {
             let theta = romanAngles[i]
@@ -750,35 +851,40 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         let anchorY = tailFrac / (1 + tailFrac)
 
         let hourLength = r * 0.50
-        let hourWidth = r * 0.11
+        let hourWidth = r * 0.12
+        let hourPath = goldHandPath(width: hourWidth, length: hourLength, taper: true)
         mainTimeHourHand.bounds = CGRect(
             x: 0, y: 0, width: hourWidth, height: hourLength * (1 + tailFrac)
         )
         mainTimeHourHand.anchorPoint = CGPoint(x: 0.5, y: anchorY)
         mainTimeHourHand.position = a.mainTimeCenter
-        mainTimeHourHand.path = goldHandPath(width: hourWidth, length: hourLength, taper: true)
+        mainTimeHourHand.path = hourPath
+        mainTimeHourHand.shadowPath = hourPath
 
-        let minuteLength = r * 0.76
+        let minuteLength = r * 0.78
         let minuteWidth = r * 0.08
+        // No pivot eye on either hand per the reference detail shot.
+        let minutePath = goldHandPath(width: minuteWidth, length: minuteLength, taper: true)
         mainTimeMinuteHand.bounds = CGRect(
             x: 0, y: 0, width: minuteWidth, height: minuteLength * (1 + tailFrac)
         )
         mainTimeMinuteHand.anchorPoint = CGPoint(x: 0.5, y: anchorY)
         mainTimeMinuteHand.position = a.mainTimeCenter
-        mainTimeMinuteHand.path = goldHandPath(
-            width: minuteWidth, length: minuteLength, taper: true, withHole: true
-        )
+        mainTimeMinuteHand.path = minutePath
+        mainTimeMinuteHand.shadowPath = minutePath
 
-        // Center hub
-        let hubR = r * 0.05
+        // Center hub — smaller (0.040) per spec.
+        let hubR = r * 0.040
+        let hubPath = CGPath(
+            ellipseIn: CGRect(x: 0, y: 0, width: hubR * 2, height: hubR * 2),
+            transform: nil
+        )
         mainTimeCenterHub.frame = CGRect(
             x: cx - hubR, y: cy - hubR,
             width: hubR * 2, height: hubR * 2
         )
-        mainTimeCenterHub.path = CGPath(
-            ellipseIn: CGRect(origin: .zero, size: mainTimeCenterHub.frame.size),
-            transform: nil
-        )
+        mainTimeCenterHub.path = hubPath
+        mainTimeCenterHub.shadowPath = hubPath
     }
 
     // MARK: Moonphase layout
@@ -800,18 +906,19 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         // Stars in the left/right margins of the wide-oval aperture (where
         // the moon disc doesn't cover at the full-moon position). fx is
         // normalized to half-width; fy is normalized to full aperture height.
+        // Positions per the design-spec star table.
         let starsPath = CGMutablePath()
         let starOuter = hw * 0.05
         let starInner = starOuter * 0.40
         let starPositions: [(CGFloat, CGFloat)] = [
-            (-0.85, 0.45),
-            (-0.65, 0.75),
-            (-0.50, 0.25),
-            ( 0.50, 0.25),
-            ( 0.65, 0.78),
-            ( 0.85, 0.45),
-            (-0.92, 0.20),
-            ( 0.92, 0.22),
+            (-0.85, 0.40),
+            (-0.62, 0.75),
+            (-0.45, 0.20),
+            (-0.92, 0.18),
+            ( 0.45, 0.22),
+            ( 0.62, 0.78),
+            ( 0.85, 0.40),
+            ( 0.92, 0.20),
         ]
         for (fx, fy) in starPositions {
             let sx = cx + fx * hw
@@ -845,10 +952,9 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         // through the (stationary) aperture mask.
         moonphaseMovingLayer.frame = moonphaseDiscContainer.bounds
 
-        // Moon disc sized to match the aperture height. The aperture is
-        // wider than tall, so the disc no longer touches the left/right —
-        // leaves room for stars in the side regions.
-        let discR = hh * 0.62
+        // Moon disc — sized so it nearly touches the top of the upper arch
+        // while leaving visible navy on left/right at the full-moon position.
+        let discR = hh * 0.72
         let moonCenterLocal = CGPoint(
             x: localApertureRect.midX,
             y: localApertureRect.minY + hh * 0.58
@@ -873,7 +979,8 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         // Gold frame around the aperture perimeter.
         moonphaseFrameLayer.frame = CGRect(origin: .zero, size: canvas)
         moonphaseFrameLayer.path = aperturePath
-        moonphaseFrameLayer.lineWidth = max(0.5, hw * 0.05)
+        moonphaseFrameLayer.lineWidth = max(0.6, hw * 0.055)
+        moonphaseFrameLayer.shadowPath = aperturePath
 
         // Clip the sky, stars, and disc container to the aperture shape.
         applyMoonphaseClip(aperturePath: aperturePath, apertureRect: apertureRect, canvasSize: canvas)
@@ -1031,14 +1138,12 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         let cx = a.bigDateCenter.x
         let cy = a.bigDateCenter.y
         let h = a.bigDateHeight
-        // Two side-by-side rectangles, butting up close, with a thin gold
-        // frame border. Lange-1 date numerals sit in near-rectangular boxes
-        // with minimal rounding.
-        let boxW = h * 0.80
-        let gap = h * 0.025
+        // Two side-by-side gold-framed white boxes (Lange 1 variant).
+        let boxW = h * 0.78
+        let gap = h * 0.04
         let totalW = boxW * 2 + gap
-        let cornerR = h * 0.04            // much less rounding
-        let frameInset = h * 0.025         // thin gold frame edge
+        let cornerR = h * 0.06              // barely rounded
+        let frameInset = h * 0.045          // thin gold frame edge
 
         let box1Rect = CGRect(
             x: cx - totalW / 2, y: cy - h / 2,
@@ -1051,27 +1156,30 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         bigDateBox1Rect = box1Rect
         bigDateBox2Rect = box2Rect
 
-        // Gold frame — a slightly larger rounded rect behind each box,
-        // creating a visible gold border when the inner white box sits on top.
+        // Gold frame — a slightly larger rounded rect behind each box.
         let frame1Rect = box1Rect.insetBy(dx: -frameInset, dy: -frameInset)
         let frame2Rect = box2Rect.insetBy(dx: -frameInset, dy: -frameInset)
         let frameCornerR = cornerR + frameInset
 
-        bigDateGoldFrame1.frame = CGRect(origin: .zero, size: canvas)
-        bigDateGoldFrame1.path = CGPath(
+        let frame1Path = CGPath(
             roundedRect: frame1Rect,
             cornerWidth: frameCornerR, cornerHeight: frameCornerR,
             transform: nil
         )
-        bigDateGoldFrame1.lineWidth = max(0.5, h * 0.012)
-
-        bigDateGoldFrame2.frame = CGRect(origin: .zero, size: canvas)
-        bigDateGoldFrame2.path = CGPath(
+        let frame2Path = CGPath(
             roundedRect: frame2Rect,
             cornerWidth: frameCornerR, cornerHeight: frameCornerR,
             transform: nil
         )
-        bigDateGoldFrame2.lineWidth = max(0.5, h * 0.012)
+        bigDateGoldFrame1.frame = CGRect(origin: .zero, size: canvas)
+        bigDateGoldFrame1.path = frame1Path
+        bigDateGoldFrame1.shadowPath = frame1Path
+        bigDateGoldFrame1.lineWidth = max(0.4, h * 0.010)
+
+        bigDateGoldFrame2.frame = CGRect(origin: .zero, size: canvas)
+        bigDateGoldFrame2.path = frame2Path
+        bigDateGoldFrame2.shadowPath = frame2Path
+        bigDateGoldFrame2.lineWidth = max(0.4, h * 0.010)
 
         bigDateBox1.frame = CGRect(origin: .zero, size: canvas)
         bigDateBox1.path = CGPath(roundedRect: box1Rect, cornerWidth: cornerR, cornerHeight: cornerR, transform: nil)
@@ -1079,24 +1187,13 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         bigDateBox2.frame = CGRect(origin: .zero, size: canvas)
         bigDateBox2.path = CGPath(roundedRect: box2Rect, cornerWidth: cornerR, cornerHeight: cornerR, transform: nil)
 
-        // Thin vertical separator between the two boxes (decorative line in
-        // the gap area).
-        let sepPath = CGMutablePath()
-        let sepX = cx
-        sepPath.addRect(CGRect(
-            x: sepX - h * 0.005, y: cy - h * 0.20,
-            width: h * 0.010, height: h * 0.40
-        ))
-        bigDateSeparator.frame = CGRect(origin: .zero, size: canvas)
-        bigDateSeparator.path = sepPath
-
-        // Numeral font for the big date — Didot or Bodoni gives the
-        // high-contrast Lange-1-like serif. Falls back to system serif bold.
-        bigDateNumeralFont = bigDateFont(size: h * 0.80)
+        // Numeral font for the big date — Didot-Bold preferred for the
+        // Lange-1-like high-contrast serif.
+        bigDateNumeralFont = bigDateFont(size: h * 0.82)
         bigDateDigit1Layer.frame = CGRect(origin: .zero, size: canvas)
         bigDateDigit2Layer.frame = CGRect(origin: .zero, size: canvas)
 
-        // Initial digits — will be overwritten by first tick
+        // Initial digits — will be overwritten by first tick.
         updateBigDateGlyphs(d1: 0, d2: 0)
     }
 
@@ -1115,6 +1212,25 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
             }
         }
         return serifFont(size: size, bold: true)
+    }
+
+    /// Slim serif font for the main time sub-dial Roman numerals. The
+    /// Lange 1 reference uses notably narrow serifs — Book/Regular weight,
+    /// NOT Bold. Prefer Bodoni 72 Book; fall back to Didot regular, then
+    /// the system serif.
+    private func romanNumeralFont(size: CGFloat) -> NSFont {
+        let candidates = [
+            "BodoniSvtyTwoITCTT-Book",
+            "Bodoni 72 Book",
+            "Didot",
+            "TimesNewRomanPSMT",
+        ]
+        for name in candidates {
+            if let font = NSFont(name: name, size: size) {
+                return font
+            }
+        }
+        return serifFont(size: size, bold: false)
     }
 
     private func updateBigDateGlyphs(d1: Int, d2: Int) {
@@ -1145,9 +1261,10 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         let r = a.subSecondsRadius
 
         let faceRect = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+        let faceCirclePathCanvas = CGPath(ellipseIn: faceRect, transform: nil)
         subSecondsFaceLayer.frame = CGRect(origin: .zero, size: canvas)
-        subSecondsFaceLayer.path = CGPath(ellipseIn: faceRect, transform: nil)
-        subSecondsFaceLayer.lineWidth = max(0.5, r * 0.020)
+        subSecondsFaceLayer.path = faceCirclePathCanvas
+        subSecondsFaceLayer.lineWidth = max(0.4, r * 0.020)
 
         let subFaceCirclePath = CGPath(
             ellipseIn: CGRect(origin: .zero, size: faceRect.size), transform: nil
@@ -1165,31 +1282,65 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         glossMask.fillColor = NSColor.white.cgColor
         subSecondsGlossLayer.mask = glossMask
 
-        // Tick marks
-        let ticksPath = CGMutablePath()
-        let outer = r * 0.92
-        let inner = r * 0.82
-        let innerShort = r * 0.86
+        // Rim shadow + lower-half highlight (same recipe as main time).
+        subSecondsRimUpperShadow.frame = CGRect(origin: .zero, size: canvas)
+        subSecondsRimUpperShadow.path = faceCirclePathCanvas
+        subSecondsRimUpperShadow.lineWidth = max(0.5, r * 0.020)
+        subSecondsRimUpperShadow.shadowOffset = CGSize(width: 0, height: -r * 0.010)
+        subSecondsRimUpperShadow.shadowRadius = r * 0.010
+        subSecondsRimUpperShadow.shadowPath = faceCirclePathCanvas
+
+        subSecondsRimLowerHighlight.frame = CGRect(origin: .zero, size: canvas)
+        subSecondsRimLowerHighlight.path = faceCirclePathCanvas
+        subSecondsRimLowerHighlight.lineWidth = max(0.3, r * 0.012)
+        let subLowerHalfMask = CAShapeLayer()
+        subLowerHalfMask.path = CGPath(rect: CGRect(
+            x: faceRect.minX, y: faceRect.minY,
+            width: faceRect.width, height: faceRect.height * 0.40
+        ), transform: nil)
+        subLowerHalfMask.fillColor = NSColor.white.cgColor
+        subSecondsRimLowerHighlight.mask = subLowerHalfMask
+
+        // Minor ticks (every minute except multiples of 5) and major ticks
+        // (every 5 seconds) live in separate layers so the line widths can
+        // differ per the reference's clear major/minor hierarchy.
+        let minorTicksPath = CGMutablePath()
+        let majorTicksPath = CGMutablePath()
+        let outer = r * 0.95
+        let majorInner = r * 0.80
+        let minorInner = r * 0.88
         for i in 0..<60 {
             let theta = .pi / 2 - (CGFloat(i) / 60) * 2 * .pi
             let dx = cos(theta), dy = sin(theta)
             let isFive = i % 5 == 0
-            let innerR = isFive ? inner : innerShort
-            ticksPath.move(to: CGPoint(x: cx + dx * innerR, y: cy + dy * innerR))
-            ticksPath.addLine(to: CGPoint(x: cx + dx * outer, y: cy + dy * outer))
+            let innerR = isFive ? majorInner : minorInner
+            let p1 = CGPoint(x: cx + dx * innerR, y: cy + dy * innerR)
+            let p2 = CGPoint(x: cx + dx * outer, y: cy + dy * outer)
+            if isFive {
+                majorTicksPath.move(to: p1)
+                majorTicksPath.addLine(to: p2)
+            } else {
+                minorTicksPath.move(to: p1)
+                minorTicksPath.addLine(to: p2)
+            }
         }
         subSecondsTicksLayer.frame = CGRect(origin: .zero, size: canvas)
-        subSecondsTicksLayer.path = ticksPath
-        subSecondsTicksLayer.lineWidth = max(0.5, r * 0.025)
+        subSecondsTicksLayer.path = minorTicksPath
+        subSecondsTicksLayer.lineWidth = max(0.3, r * 0.018)
+        subSecondsTicksLayer.lineCap = .butt
 
-        // Numerals at 10 / 20 / 30 / 40 / 50 / 60 (Arabic)
+        subSecondsTicksMajorLayer.frame = CGRect(origin: .zero, size: canvas)
+        subSecondsTicksMajorLayer.path = majorTicksPath
+        subSecondsTicksMajorLayer.lineWidth = max(0.5, r * 0.030)
+        subSecondsTicksMajorLayer.lineCap = .butt
+
+        // Numerals at 60 / 10 / 20 / 30 / 40 / 50 (Arabic).
         let numerals = ["60", "10", "20", "30", "40", "50"]
-        let numeralRadius = r * 0.70
+        let numeralRadius = r * 0.68
         let numeralFontSize = r * 0.22
         let numeralFont = serifFont(size: numeralFontSize, bold: false)
         let numeralsPath = CGMutablePath()
         for (i, str) in numerals.enumerated() {
-            // i=0 → 60 at top (theta = π/2); i=1 → 10 at 60° clockwise; etc.
             let theta = .pi / 2 - (CGFloat(i) / 6) * 2 * .pi
             let nx = cx + cos(theta) * numeralRadius
             let ny = cy + sin(theta) * numeralRadius
@@ -1204,23 +1355,27 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         subSecondsNumeralsLayer.frame = CGRect(origin: .zero, size: canvas)
         subSecondsNumeralsLayer.path = numeralsPath
 
-        // Hand
-        let handLength = r * 0.78
-        let handWidth = r * 0.07
+        // Hand — slim needle, no counterweight tail (confirmed in reference).
+        let handLength = r * 0.85
+        let handWidth = r * 0.06
+        let secondsHandPath = goldHandPath(width: handWidth, length: handLength, taper: false)
         subSecondsHand.bounds = CGRect(x: 0, y: 0, width: handWidth, height: handLength)
         subSecondsHand.position = a.subSecondsCenter
-        subSecondsHand.path = goldHandPath(width: handWidth, length: handLength, taper: false)
+        subSecondsHand.path = secondsHandPath
+        subSecondsHand.shadowPath = secondsHandPath
 
         // Hub
-        let hubR = r * 0.07
+        let hubR = r * 0.06
+        let subHubPath = CGPath(
+            ellipseIn: CGRect(x: 0, y: 0, width: hubR * 2, height: hubR * 2),
+            transform: nil
+        )
         subSecondsHub.frame = CGRect(
             x: cx - hubR, y: cy - hubR,
             width: hubR * 2, height: hubR * 2
         )
-        subSecondsHub.path = CGPath(
-            ellipseIn: CGRect(origin: .zero, size: subSecondsHub.frame.size),
-            transform: nil
-        )
+        subSecondsHub.path = subHubPath
+        subSecondsHub.shadowPath = subHubPath
     }
 
     // MARK: Power reserve layout
@@ -1230,31 +1385,23 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         let cy = a.powerReserveCenter.y
         let r = a.powerReserveRadius
 
-        // Power reserve arc on the RIGHT side of the dial, opening LEFT
-        // (toward the dial center). The arc spans 90° centered on the +x
-        // axis. AUF (full) at the upper end (π/4), AB (empty) at the lower
-        // end (-π/4). Arc sweeps clockwise through 0 (rightmost point).
-        //
-        // y-up Core Animation angles: 0=right, π/2=up, π=left, -π/2=down.
-        // Narrower angular span (~82°) with a larger radius gives the
-        // "tall vertical scale" feel of the Lange 1 power reserve.
-        let arcSpan: CGFloat = .pi / 2.2
+        // Power reserve arc on the RIGHT edge, opening LEFT. Narrower
+        // angular span (~75°) than 90° gives the Lange's tall-vertical feel.
+        let arcSpan: CGFloat = .pi / 2.4
         let aufAngle: CGFloat = arcSpan / 2     // upper-right
         let abAngle: CGFloat = -arcSpan / 2     // lower-right
         powerReserveAUFAngle = aufAngle
         powerReserveABAngle = abAngle
         powerReservePivot = CGPoint(x: cx, y: cy)
 
-        // Tick marks along the arc path. Reference detail shot shows ONLY
-        // the major ticks prominently — AUF, midpoint, AB. Minor ticks are
-        // present but very faint. We split into two layers (major dark,
-        // minor light/thin) but here render minors only in this layer.
+        // Two separate tick layers: lightweight minors at the perimeter
+        // (faint) and major ticks at AUF / midpoint / AB (darker, longer).
         let minorTicksPath = CGMutablePath()
         let majorTicksPath = CGMutablePath()
         let tickCount = 8
         let tickOuter = r
-        let minorInner = r * 0.93
-        let majorInner = r * 0.83
+        let minorInner = r * 0.92
+        let majorInner = r * 0.82
         for i in 0...tickCount {
             let t = CGFloat(i) / CGFloat(tickCount)
             let angle = aufAngle - t * (aufAngle - abAngle)
@@ -1271,32 +1418,24 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
                 minorTicksPath.addLine(to: p2)
             }
         }
-        // Combine into one path; visual hierarchy comes from lighter color +
-        // thinner line for minors via the layer's stroke settings (one color
-        // applies). We approximate the "AUF/midpoint/AB dominant" look by
-        // shortening minors and keeping a single uniform stroke that reads
-        // as subtle uniform graduation — matching the reference where the
-        // intermediate ticks are barely visible.
-        let combinedPath = CGMutablePath()
-        combinedPath.addPath(minorTicksPath)
-        combinedPath.addPath(majorTicksPath)
         powerReserveArcLayer.frame = CGRect(origin: .zero, size: canvas)
-        powerReserveArcLayer.path = combinedPath
-        powerReserveArcLayer.lineWidth = max(0.5, r * 0.030)
-        powerReserveArcLayer.lineCap = .round
-        powerReserveArcLayer.strokeColor = AsymmetricMoonphasePalette.subDialNumeral
+        powerReserveArcLayer.path = minorTicksPath
+        powerReserveArcLayer.lineWidth = max(0.3, r * 0.014)
+        powerReserveArcLayer.lineCap = .butt
 
-        // Red triangles at AUF + AB ends
-        let triR = r * 0.10
+        powerReserveTicksMajorLayer.frame = CGRect(origin: .zero, size: canvas)
+        powerReserveTicksMajorLayer.path = majorTicksPath
+        powerReserveTicksMajorLayer.lineWidth = max(0.5, r * 0.030)
+        powerReserveTicksMajorLayer.lineCap = .butt
+
+        // Red triangles at AUF + AB ends — point OUTWARD (away from pivot).
+        let triR = r * 0.085
         let trianglesPath = CGMutablePath()
-        for (angle, pointInward) in [(aufAngle, false), (abAngle, false)] {
-            let _ = pointInward
+        for angle in [aufAngle, abAngle] {
             let baseCx = cx + cos(angle) * r
             let baseCy = cy + sin(angle) * r
-            // Triangle points outward (away from pivot)
             let tipX = cx + cos(angle) * (r + triR * 0.9)
             let tipY = cy + sin(angle) * (r + triR * 0.9)
-            // Two base corners perpendicular to angle direction
             let perpA = angle + .pi / 2
             let cornerAX = baseCx + cos(perpA) * triR * 0.5
             let cornerAY = baseCy + sin(perpA) * triR * 0.5
@@ -1310,12 +1449,11 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         powerReserveRedTrianglesLayer.frame = CGRect(origin: .zero, size: canvas)
         powerReserveRedTrianglesLayer.path = trianglesPath
 
-        // Labels: AUF (top), AB (bottom). Tiny serif text positioned just
-        // beyond the red triangles, on the inside of the arc (toward the dial).
-        let labelFontSize = r * 0.22
+        // Labels: AUF (top), AB (bottom). Smaller serif text inside the arc.
+        let labelFontSize = r * 0.18
         let labelFont = serifFont(size: labelFontSize, bold: false)
         let labelsPath = CGMutablePath()
-        let labelInner = r * 0.65
+        let labelInner = r * 0.60
         for (text, angle) in [("AUF", aufAngle), ("AB", abAngle)] {
             let lx = cx + cos(angle) * labelInner
             let ly = cy + sin(angle) * labelInner
@@ -1330,17 +1468,20 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         powerReserveLabelsLayer.frame = CGRect(origin: .zero, size: canvas)
         powerReserveLabelsLayer.path = labelsPath
 
-        // Indicator hand — slim lance with counterweight tail.
+        // Indicator hand — slim lance with counterweight tail; no hub disc
+        // (pivot is hidden behind the bezel edge in the reference).
         let tailFrac = Self.handTailFraction
         let anchorY = tailFrac / (1 + tailFrac)
-        let handLength = r * 0.74
-        let handWidth = r * 0.18
+        let handLength = r * 0.82
+        let handWidth = r * 0.14
+        let prHandPath = goldHandPath(width: handWidth, length: handLength, taper: true)
         powerReserveIndicatorHand.bounds = CGRect(
             x: 0, y: 0, width: handWidth, height: handLength * (1 + tailFrac)
         )
         powerReserveIndicatorHand.anchorPoint = CGPoint(x: 0.5, y: anchorY)
         powerReserveIndicatorHand.position = a.powerReserveCenter
-        powerReserveIndicatorHand.path = goldHandPath(width: handWidth, length: handLength, taper: true)
+        powerReserveIndicatorHand.path = prHandPath
+        powerReserveIndicatorHand.shadowPath = prHandPath
     }
 
     private func updatePowerReserveHand(fraction: Double) {
@@ -1430,14 +1571,14 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         let cx = width / 2
         if taper {
             let tailL = length * Self.handTailFraction
-            let shaftW = width * 0.16            // slim shaft
-            let tailW = width * 0.52             // small lozenge at the tail end
+            let shaftW = width * 0.18            // slim shaft
+            let tailW = width * 0.55             // small lozenge at the tail end
             let diamondW = width                 // peak blade width = input width
-            // Larger lozenge (40-90% of forward length) with peak at the
-            // midpoint — symmetric blade, matching the Lange 1 reference.
-            let diamondStartY = tailL + length * 0.40
-            let diamondPeakY = tailL + length * 0.65
-            let tipNarrowY = tailL + length * 0.90
+            // Symmetric blade (lozenge from 42% to 92% of forward length,
+            // peak at 66%) per the design spec.
+            let diamondStartY = tailL + length * 0.42
+            let diamondPeakY = tailL + length * 0.66
+            let tipNarrowY = tailL + length * 0.92
             let tipY = tailL + length
 
             path.move(to: CGPoint(x: cx, y: 0))
@@ -1465,13 +1606,14 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
                 ))
             }
         } else {
-            // Slim needle with a pointed tip — sub-seconds hand (no tail).
-            let baseHalf = width * 0.40
+            // Slim gold needle, no counterweight tail (sub-seconds hand) per
+            // design-spec vertex coords.
+            let baseHalf = width * 0.45
             path.move(to: CGPoint(x: cx - baseHalf, y: 0))
             path.addLine(to: CGPoint(x: cx + baseHalf, y: 0))
-            path.addLine(to: CGPoint(x: cx + baseHalf * 0.55, y: length * 0.90))
+            path.addLine(to: CGPoint(x: cx + baseHalf * 0.40, y: length * 0.88))
             path.addLine(to: CGPoint(x: cx, y: length))
-            path.addLine(to: CGPoint(x: cx - baseHalf * 0.55, y: length * 0.90))
+            path.addLine(to: CGPoint(x: cx - baseHalf * 0.40, y: length * 0.88))
             path.closeSubpath()
         }
         return path
@@ -1479,5 +1621,5 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
 
     /// Fraction of forward length that the counterweight tail extends behind
     /// the pivot for tapered (Lange-style) hands. Tail is small but visible.
-    private static let handTailFraction: CGFloat = 0.22
+    private static let handTailFraction: CGFloat = 0.20
 }

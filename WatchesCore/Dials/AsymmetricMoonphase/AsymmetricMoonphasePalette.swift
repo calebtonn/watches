@@ -5,114 +5,122 @@ import CoreGraphics
 ///
 /// All colors are sRGB. Inline `NSColor(srgbRed:...)` constants — no asset
 /// catalogs for dial colors per the architecture's per-dial conventions.
+///
+/// Values calibrated by the Pass E design-spec.md after side-by-side
+/// reference comparison.
 public enum AsymmetricMoonphasePalette {
 
     // MARK: Case / bezel — gold
 
-    /// Warm gold case body — mid-tone of the bezel's vertical gradient.
     public static let caseGold: CGColor = NSColor(
-        srgbRed: 0.82, green: 0.65, blue: 0.40, alpha: 1.0
+        srgbRed: 0.78, green: 0.60, blue: 0.32, alpha: 1.0
     ).cgColor
 
-    /// Top-edge highlight of the gold bezel — lit by an imagined top-front
-    /// light source.
     public static let caseGoldHighlight: CGColor = NSColor(
-        srgbRed: 0.96, green: 0.85, blue: 0.62, alpha: 1.0
+        srgbRed: 0.98, green: 0.88, blue: 0.62, alpha: 1.0
     ).cgColor
 
-    /// Bottom-edge shadow of the gold bezel.
     public static let caseGoldShadow: CGColor = NSColor(
-        srgbRed: 0.50, green: 0.38, blue: 0.22, alpha: 1.0
+        srgbRed: 0.42, green: 0.28, blue: 0.12, alpha: 1.0
     ).cgColor
 
-    /// Outer rim accent — a thin bright stroke at the very outer edge.
+    /// Mid-tone between gold and highlight — bezel gradient stop.
+    public static let caseGoldMid: CGColor = NSColor(
+        srgbRed: 0.92, green: 0.76, blue: 0.45, alpha: 1.0
+    ).cgColor
+
     public static let caseRim: CGColor = NSColor(
-        srgbRed: 1.00, green: 0.92, blue: 0.72, alpha: 1.0
+        srgbRed: 1.00, green: 0.94, blue: 0.78, alpha: 1.0
+    ).cgColor
+
+    /// Engraved inner lip at the bezel/dial boundary (semi-transparent).
+    public static let caseInnerLip: CGColor = NSColor(
+        srgbRed: 0.30, green: 0.20, blue: 0.10, alpha: 0.7
     ).cgColor
 
     // MARK: Dial face — silver / champagne
 
-    /// Main dial face — silver-champagne with a slight warm cast.
     public static let dialFace: CGColor = NSColor(
-        srgbRed: 0.95, green: 0.93, blue: 0.88, alpha: 1.0
+        srgbRed: 0.945, green: 0.935, blue: 0.905, alpha: 1.0
     ).cgColor
 
-    /// Sub-dial face — slightly lighter than the main dial so the sub-dials
-    /// visually pop. The Lange 1's sub-dials have this barely-perceptible
-    /// halo.
+    /// Warm shadow tone for the faceplate vignette perimeter.
+    public static let dialFaceShadow: CGColor = NSColor(
+        srgbRed: 0.55, green: 0.50, blue: 0.40, alpha: 0.18
+    ).cgColor
+
     public static let subDialFace: CGColor = NSColor(
-        srgbRed: 0.97, green: 0.95, blue: 0.91, alpha: 1.0
+        srgbRed: 0.965, green: 0.955, blue: 0.925, alpha: 1.0
     ).cgColor
 
-    /// Soft edge shadow at the sub-dial boundary — sells the recessed look.
+    /// Recessed-edge shadow tone (semi-transparent so it blends with the face).
     public static let subDialShadow: CGColor = NSColor(
-        srgbRed: 0.74, green: 0.72, blue: 0.66, alpha: 1.0
+        srgbRed: 0.55, green: 0.50, blue: 0.40, alpha: 0.70
     ).cgColor
 
-    // MARK: Hands + numerals + tick marks
+    // MARK: Hands + numerals + tick marks — gold "applied" alloy
 
-    /// Gold hand color — slightly darker than the case so the hands read
-    /// against the silver dial without disappearing into the bezel.
+    /// Warm gold used for hands, hour markers, Roman numerals, hub, date
+    /// frames, aperture rim — every "applied" gold element shares this tone.
     public static let handGold: CGColor = NSColor(
-        srgbRed: 0.72, green: 0.55, blue: 0.28, alpha: 1.0
+        srgbRed: 0.86, green: 0.68, blue: 0.36, alpha: 1.0
     ).cgColor
 
-    /// Roman numeral + tick mark color — near-black with a slight warm cast
-    /// to match the dial's champagne tint.
+    /// Near-black printed text/tick color (slightly translucent so it doesn't
+    /// read as a stark line on the warm silver face).
     public static let numeralBlack: CGColor = NSColor(
-        srgbRed: 0.13, green: 0.11, blue: 0.08, alpha: 1.0
+        srgbRed: 0.12, green: 0.10, blue: 0.08, alpha: 0.92
     ).cgColor
 
-    /// Sub-dial Arabic numerals + ticks — slightly lighter than the main
-    /// dial's black so the visual hierarchy stays right.
+    /// Sub-dial Arabic numerals + major ticks — same warm dark as numeralBlack
+    /// but slightly heavier so they read in the smaller sub-dial.
     public static let subDialNumeral: CGColor = NSColor(
         srgbRed: 0.20, green: 0.16, blue: 0.10, alpha: 1.0
     ).cgColor
 
     // MARK: Moonphase
 
-    /// Moonphase aperture sky — deep blue/navy with a hint of indigo.
     public static let moonSky: CGColor = NSColor(
-        srgbRed: 0.10, green: 0.16, blue: 0.32, alpha: 1.0
+        srgbRed: 0.09, green: 0.14, blue: 0.30, alpha: 1.0
     ).cgColor
 
-    /// Moon disc — lighter than the case gold so it reads against the navy sky.
     public static let moonGold: CGColor = NSColor(
-        srgbRed: 0.94, green: 0.82, blue: 0.50, alpha: 1.0
+        srgbRed: 0.95, green: 0.82, blue: 0.50, alpha: 1.0
     ).cgColor
 
-    /// Decorative gold stars dotted on the navy aperture.
+    /// Darker bronze for the man-in-the-moon eye dots + smile arc.
+    public static let moonFaceBronze: CGColor = NSColor(
+        srgbRed: 0.55, green: 0.36, blue: 0.16, alpha: 1.0
+    ).cgColor
+
     public static let starGold: CGColor = NSColor(
         srgbRed: 1.00, green: 0.92, blue: 0.62, alpha: 1.0
     ).cgColor
 
-    // MARK: Big date window (Lange's iconic outsize date)
+    // MARK: Big date window
 
-    /// Big-date box background — white, paper-bright.
     public static let dateBackground: CGColor = NSColor(
         srgbRed: 1.00, green: 0.99, blue: 0.96, alpha: 1.0
     ).cgColor
 
-    /// Big-date numeral — true black.
     public static let dateNumeral: CGColor = NSColor(
         srgbRed: 0.05, green: 0.04, blue: 0.03, alpha: 1.0
     ).cgColor
 
-    /// Thin separator line between the two date digit boxes.
-    public static let dateSeparator: CGColor = NSColor(
-        srgbRed: 0.60, green: 0.55, blue: 0.45, alpha: 1.0
+    /// Subtle inner-shadow stroke at the white-box edge under the gold frame.
+    public static let dateBoxInnerShadow: CGColor = NSColor(
+        white: 0.0, alpha: 0.15
     ).cgColor
 
     // MARK: Power reserve indicator
 
-    /// Red triangular markers at the AUF (top) and AB (bottom) of the
-    /// power-reserve arc.
     public static let powerReserveRed: CGColor = NSColor(
-        srgbRed: 0.78, green: 0.20, blue: 0.18, alpha: 1.0
+        srgbRed: 0.80, green: 0.16, blue: 0.14, alpha: 1.0
     ).cgColor
 
-    /// Power-reserve arc track — thin engraved-looking line.
+    /// Minor power-reserve tick color (lighter than major ticks so the
+    /// AUF / midpoint / AB majors dominate).
     public static let powerReserveTrack: CGColor = NSColor(
-        srgbRed: 0.55, green: 0.50, blue: 0.40, alpha: 1.0
+        srgbRed: 0.40, green: 0.34, blue: 0.22, alpha: 0.70
     ).cgColor
 }
