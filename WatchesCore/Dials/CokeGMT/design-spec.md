@@ -54,6 +54,93 @@ rather than layout geometry.
 
 ---
 
+## Notes on Pass 2 (2026-05-14)
+
+Pass-1 shipped structurally complete. Caleb reviewed
+`snapshots/cokeGMT.png` against `faces/tudor-m7939g1a0nru-0003.jpg` and
+flagged three explicit issues plus requested a full photorealism re-pass.
+The renderer is unchanged; this document is the contract for the diff.
+
+**Three explicit fixes (must land):**
+
+1. **Bezel orientation rotated 90° (Element 2).** Pass-1's spec used the
+   wrong angle convention — `-π/2` was annotated as "3 o'clock" when
+   in Core Animation y-up it's actually 6 o'clock visual. The renderer
+   faithfully implemented the wrong spec, so the snapshot shows BLACK
+   on the right half / RED on the left half. Caleb wants **black on
+   TOP, red on BOTTOM** (which matches the Tudor reference and the 24h
+   scale: "6" sits at 3 o'clock visual = angle `0`, "18" at 9 o'clock
+   visual = angle `π`, so the split is the HORIZONTAL diameter). Element
+   2 below is fully rewritten with the corrected geometry; the spec
+   angle convention is now stated up-front.
+
+2. **Date placeholder flash (Element 13).** The renderer initializes
+   with `updateDateDigit(day: 0)` which clamps to "1" via
+   `max(1, min(31, 0))`, then the first real tick overwrites it. If
+   the screensaver host captures a frame before that first tick, the
+   user sees "1" instead of today's date. Element 13 now specifies:
+   **initialize the digit to today's day at `attach()` time** via a
+   one-time `Date()` read. This is install-time visual only — not a
+   P4 "time drives render" violation, because the placeholder is
+   overwritten by the next real `tick()` and time-driving correctness
+   is unchanged.
+
+3. **Snowflake at the END of the hands (Elements 8, 9).** Pass-1's hour
+   hand had the lozenge running 45→85% of length with a 15% tip cap
+   (88→100%). The Tudor reference clearly shows a SMALL pointed cap
+   past the snowflake — reading (a) from the prompt, not (b). Pass-2
+   moves the lozenge outward and shortens the cap:
+   - Hour hand: lozenge `0.60 → 0.90`, tip cap `0.93 → 1.00` (cap = 7%
+     of length, was 12%).
+   - Minute hand: lozenge `0.74 → 0.93`, tip cap `0.95 → 1.00` (cap =
+     5% of length, was 10%).
+
+**Additional findings from photorealism re-pass:**
+
+- **Ceramic sheen is too narrow.** Element 21's radial gradient is
+  positioned at `(0.25, 0.80) → (0.85, 0.20)` which produces a soft
+  upper-left glow only — the snapshot shows the bezel reading slightly
+  flat. The reference shows a broader curved highlight tracing the
+  upper-left third of the bezel arc. Element 22 (new) adds a SECOND
+  sheen layer — a stroked arc on the bezel centerline — to give the
+  ceramic a clear "rounded surface" cue. Keeps Element 21 as the soft
+  area-light bloom; adds a more directional arc highlight on top.
+- **GMT hand too thin to read (Element 11).** The arrowhead width
+  multiplier was `width * 2.4` (full width = 4.8 × shaft = 0.106 ×
+  dialRadius). Reference shows a clearly readable arrowhead at this
+  resolution. Pass-2 widens the shaft to `dialRadius * 0.028` and the
+  arrowhead to `width * 3.0` (full arrowhead = 0.168 × dialRadius,
+  ~60% larger area).
+- **Seconds hand tip lume dot now MANDATORY (Element 10).** Pass-1
+  marked it "optional" — the rendered seconds hand is thin enough that
+  the tip is hard to track. The reference shows it clearly. Pass-2
+  promotes it to required.
+- **6/9 bar markers slightly too narrow (Element 6b).** Width was
+  `dialRadius * 0.045`. Reference bars read chunkier — pass-2 widens
+  to `dialRadius * 0.055`.
+- **Specular highlights now wired (Elements 19, 20).** Pass-1 specced
+  `applyLumeSpecular` and `applyGoldSpecular` but the renderer shipped
+  without them. The flat appearance of the cream snowflakes and gold
+  GMT hand in the snapshot is the biggest "rendered, not photographed"
+  tell. Pass-2 marks specular application as **required** on hands,
+  markers, date frame, GMT hand, seconds hand, and center hub.
+- **Lower-right case shadow deepening (Element 1).** Reference shows
+  significant shadow on the lower-right rim of the case. Pass-1's case
+  gradient already has this in the color stops; recommend tightening
+  `caseSteelShadow` to `(0.34, 0.35, 0.38, 1.0)` for more contrast.
+
+**What's NOT changing in Pass 2:**
+
+- Hour markers (dots, triangle at 12) — proportions read correct.
+- Date window proportions and digit weight — read correct.
+- Minute track — read correct.
+- Color palette except the case-shadow tightening above.
+- 24h numeral placement and font.
+- Hand rotation math and `tick()` contract.
+- Helpers (`textPath`, `bezelHalfPath`) and renderer structure.
+
+---
+
 ## Element 1 — Case (stainless steel disc)
 
 The Tudor Black Bay case is a **polished + brushed stainless steel disc**.
@@ -84,8 +171,11 @@ a brushed top face, capped by the bezel insert.
     - `0.00` → `caseSteelHighlight = (0.96, 0.96, 0.97, 1.0)` — bright
       brushed-steel highlight near the top edge of the case.
     - `0.45` → `caseSteel = (0.78, 0.79, 0.82, 1.0)` — mid steel tone.
-    - `1.00` → `caseSteelShadow = (0.42, 0.43, 0.46, 1.0)` — deep
-      shadow at the bottom of the case.
+    - `1.00` → `caseSteelShadow = (0.34, 0.35, 0.38, 1.0)` — deep
+      shadow at the bottom of the case. *(updated Pass 2 — Pass-1
+      value `(0.42, 0.43, 0.46)` left the lower-right of the case
+      reading flat against the reference; darkening by ~8% adds the
+      curved-body shadow the reference shows.)*
   - This case-top gradient only shows in the chamfer ring (radii 0.80
     → 0.88) and the polished bezel rim (radii 0.99 → 1.00) — the
     bezel insert fully covers the annulus between them.
@@ -139,25 +229,36 @@ rim → outer rim glint → chamfer glint → inner edge stroke → dial face.
 
 ---
 
-## Element 2 — Bicolor ceramic bezel insert (THE signature element)
+## Element 2 — Bicolor ceramic bezel insert (THE signature element) *(updated Pass 2 — corrected angle convention; black goes on TOP, red on BOTTOM)*
 
 The bezel insert is a flat ceramic annulus in two halves: **black on the
 upper half (over the top of the dial, covering hours 18 → 24 → 6 on a 24h
 scale)** and **red on the lower half (covering hours 6 → 12 → 18 going
 under)**. The Coke colorway names the watch.
 
-**Critical reference observation:** the split is at the 6 and 18 positions
-on the 24h scale, which correspond to **angles of -π/2 and +π/2** (i.e.
-3 o'clock and 9 o'clock on a 12h face). So:
+**Angle convention (canonical reference for this entire spec):** Core
+Animation y-up. With angles measured CCW from the positive x axis:
 
-- **Black half:** the upper arc from angle `-π/2` (3 o'clock — where "6"
-  sits on the 24h scale) going CCW through `π/2` to `+π/2` (9 o'clock —
-  where "18" sits). In Core Animation y-up convention: from `-π/2` to
-  `+π/2` going CCW means sweeping through the TOP of the dial (`0`, `π/2`,
-  `π`). So the black half covers angles `[-π/2, +π/2]` swept CCW,
-  equivalent to the upper semicircle.
-- **Red half:** the lower arc from `+π/2` to `-π/2` going CCW (through
-  `π`, `-π/2`), i.e. the lower semicircle.
+- `0` = **3 o'clock visual** (positive x axis) — "6" on the 24h scale.
+- `+π/2` = **12 o'clock visual** (positive y axis) — "24/00" pip.
+- `π` = **9 o'clock visual** (negative x axis) — "18" on the 24h scale.
+- `-π/2` = **6 o'clock visual** (negative y axis) — "12" on the 24h scale.
+
+Pass-1's text mis-labeled `-π/2` as 3 o'clock; that was wrong and is now
+corrected. The bezel split happens on the **HORIZONTAL diameter**: "6"
+at angle `0` (right) and "18" at angle `π` (left). The black half is the
+upper semicircle (between those split points, sweeping over the top); the
+red half is the lower semicircle (sweeping under).
+
+**Black-half arc geometry:** sweep CCW from `0` to `π` — that's from 3
+o'clock visual, up through 12 o'clock visual, to 9 o'clock visual. Upper
+semicircle.
+
+**Red-half arc geometry:** sweep CW from `0` to `π` — that's from 3
+o'clock visual, down through 6 o'clock visual, to 9 o'clock visual. Lower
+semicircle. (Equivalently: CCW from `π` to `0` would also describe the
+lower path going right-to-left; the implementation should match
+`bezelHalfPath`'s argument order — see below.)
 
 **Annulus geometry:**
 
@@ -168,19 +269,28 @@ on the 24h scale, which correspond to **angles of -π/2 and +π/2** (i.e.
 - **Radial thickness:** ≈ 11% of caseRadius. This is wide enough to
   hold the 24h numerals comfortably.
 
-**Each half is a `CAShapeLayer` built with a CCW-swept arc ring path:**
+**Each half is a `CAShapeLayer` built with a CCW-swept arc ring path.**
+The existing `bezelHalfPath(center:outerR:innerR:startAngle:endAngle:clockwise:)`
+helper signature is unchanged. Calls become:
 
-```
-moveTo(point at angle θ_start on outerR)
-addArc(center: caseCenter, radius: outerR, startAngle: θ_start, endAngle: θ_end, clockwise: false)
-addLine(to point at angle θ_end on innerR)
-addArc(center: caseCenter, radius: innerR, startAngle: θ_end, endAngle: θ_start, clockwise: true)
-closeSubpath()
+```swift
+// Black half — upper semicircle
+let blackHalfPath = bezelHalfPath(
+    center: caseCenter, outerR: bezelOuterR, innerR: bezelInnerR,
+    startAngle: 0, endAngle: .pi, clockwise: false  // CCW: 3 → 12 → 9
+)
+
+// Red half — lower semicircle
+let redHalfPath = bezelHalfPath(
+    center: caseCenter, outerR: bezelOuterR, innerR: bezelInnerR,
+    startAngle: 0, endAngle: .pi, clockwise: true   // CW: 3 → 6 → 9
+)
 ```
 
-For the **black half**: `θ_start = -π/2`, `θ_end = +π/2`.
-For the **red half**: `θ_start = +π/2`, `θ_end = -π/2` (which when swept
-CCW takes the lower path through `π`).
+The two halves share the same start/end angles; only `clockwise:` flips.
+This is the corrected geometry — verify in code that swapping these
+booleans is the entire bezel fix (no other angles in Element 2 need
+change).
 
 **Black-half fill — `CAGradientLayer` masked to the black-half shape:**
 - Type: `.axial`
@@ -467,7 +577,9 @@ toward the center, so they look like elongated capsules pointing inward).
 - **Radial outer end:** `barOuterR = dialRadius * 0.86`.
 - **Radial inner end:** `barInnerR = dialRadius * 0.66`.
 - **Bar length (radial):** `barOuterR - barInnerR = dialRadius * 0.20`.
-- **Bar width (perpendicular):** `dialRadius * 0.045`.
+- **Bar width (perpendicular):** `dialRadius * 0.055`. *(updated Pass 2
+  — was `0.045`; reference bars read chunkier than dots and the Pass-1
+  snapshot showed them too thin relative to the dot diameter.)*
 - **Corner radius:** half the bar width (so the bar caps are rounded —
   the reference bars have rounded ends, not square).
 - **Fill:** `lumeCream`.
@@ -575,20 +687,28 @@ tailFraction))`. `anchorPoint = (0.5, tailFraction / (1 + tailFraction))`,
 so the pivot point is at `(width/2, tailFraction * length)` in
 bounds-local coords. The hand intrinsically points "up" (toward +y).
 
-**Proportions:**
+**Proportions** *(updated Pass 2 — snowflake moved outward; tip cap shortened)*:
 
-| Property              | Value             |
-|-----------------------|-------------------|
-| `tailFraction`        | 0.0 (no counterweight tail) |
-| `shaftWidth`          | `width * 0.18`    |
-| `lozengeStartY`       | `length * 0.45`   |
-| `lozengeMidY`         | `length * 0.66`   |
-| `lozengeEndY`         | `length * 0.85`   |
-| `lozengeHalfWidth`    | `width * 0.50` (lozenge full-width = 1.0 * width) |
-| `lozengeChamfer`      | `width * 0.10` (corner chamfer offset on the lozenge) |
-| `tipBaseY`            | `length * 0.88`   |
-| `tipBaseHalfWidth`    | `width * 0.18`    |
-| `tipY`                | `length * 1.00`   |
+| Property              | Value             | Pass-1 value | Note |
+|-----------------------|-------------------|--------------|------|
+| `tailFraction`        | 0.0 (no counterweight tail) | 0.0   | unchanged |
+| `shaftWidth`          | `width * 0.18`    | `width * 0.18` | unchanged |
+| `lozengeStartY`       | `length * 0.60`   | `length * 0.45` | **moved outward** — shaft is now longer, lozenge sits in the outer third of the hand |
+| `lozengeMidY`         | `length * 0.75`   | `length * 0.66` | midpoint of new range |
+| `lozengeEndY`         | `length * 0.90`   | `length * 0.85` | **moved outward** |
+| `lozengeHalfWidth`    | `width * 0.50` (lozenge full-width = 1.0 * width) | unchanged | unchanged |
+| `lozengeChamfer`      | `width * 0.10` (corner chamfer offset on the lozenge) | unchanged | unchanged |
+| `tipBaseY`            | `length * 0.93`   | `length * 0.88` | **moved outward** — gap from lozengeEndY to tipBaseY stays at 0.03 (small chamfered transition) |
+| `tipBaseHalfWidth`    | `width * 0.18`    | `width * 0.18` | unchanged |
+| `tipY`                | `length * 1.00`   | unchanged | unchanged |
+
+Net effect: the snowflake lozenge now occupies the outer third of the
+hand (`0.60 → 0.90`), with a short pointed cap past it (`0.93 → 1.00`,
+just 7% of length). The cap is approximately half its Pass-1 size. This
+matches the Tudor reference: the snowflake sits visibly at the END of
+the hand, with a small pointed lume tip past it. Reading (a) from the
+prompt — NOT reading (b) (the snowflake is not the tip itself; it has a
+small cap past it).
 
 Note: the **hour-hand snowflake is intentionally square-ish** — width =
 `length * (some_ratio)`. We achieve this by making the lozenge's
@@ -701,25 +821,27 @@ The minute hand is the same overall silhouette as the hour hand but:
 - `width = dialRadius * 0.115` — slimmer than the hour hand (0.16).
 
 **Proportions (same path constructor as the hour hand, with these
-ratios):**
+ratios)** *(updated Pass 2 — snowflake moved outward; tip cap shortened)*:
 
-| Property              | Value             |
-|-----------------------|-------------------|
-| `tailFraction`        | 0.0               |
-| `shaftWidth`          | `width * 0.14` (slimmer than hour's 0.18) |
-| `lozengeStartY`       | `length * 0.62` (lozenge starts further out — longer shaft, shorter snowflake) |
-| `lozengeMidY`         | `length * 0.74`   |
-| `lozengeEndY`         | `length * 0.86`   |
-| `lozengeHalfWidth`    | `width * 0.50`    |
-| `lozengeChamfer`      | `width * 0.10`    |
-| `tipBaseY`            | `length * 0.90`   |
-| `tipBaseHalfWidth`    | `width * 0.16`    |
-| `tipY`                | `length * 1.00`   |
+| Property              | Value             | Pass-1 value | Note |
+|-----------------------|-------------------|--------------|------|
+| `tailFraction`        | 0.0               | 0.0          | unchanged |
+| `shaftWidth`          | `width * 0.14` (slimmer than hour's 0.18) | unchanged | unchanged |
+| `lozengeStartY`       | `length * 0.74` (lozenge starts further out — longer shaft, shorter snowflake) | `length * 0.62` | **moved outward** |
+| `lozengeMidY`         | `length * 0.83`   | `length * 0.74` | midpoint of new range |
+| `lozengeEndY`         | `length * 0.93`   | `length * 0.86` | **moved outward** |
+| `lozengeHalfWidth`    | `width * 0.50`    | unchanged | unchanged |
+| `lozengeChamfer`      | `width * 0.10`    | unchanged | unchanged |
+| `tipBaseY`            | `length * 0.95`   | `length * 0.90` | **moved outward** |
+| `tipBaseHalfWidth`    | `width * 0.16`    | unchanged | unchanged |
+| `tipY`                | `length * 1.00`   | unchanged | unchanged |
 
-The lozenge here is `length * 0.24` tall and `width * 1.0 = dialRadius *
-0.115` wide — narrower-than-tall (the minute hand's lozenge is
-slightly elongated). This is correct per the reference: the minute hand's
-snowflake is visibly slimmer and less square than the hour hand's.
+Net effect: the minute-hand lozenge now occupies `0.74 → 0.93` of length
+with a 5%-of-length pointed cap (`0.95 → 1.00`). The cap is roughly half
+its Pass-1 size. The lozenge is `length * 0.19` tall and `width * 1.0 =
+dialRadius * 0.115` wide — still narrower-than-tall (the minute hand's
+lozenge stays visibly slimmer and less square than the hour hand's).
+Matches reading (a) from the prompt.
 
 **Fill, stroke, shadow, specular:** identical to the hour hand — lume
 cream fill, cream-gold outline, lower-right drop shadow, lume-specular
@@ -765,7 +887,7 @@ hand in the same cream-gold color family as the GMT hand (NOT silver).
 - Radius: `pommelRadius`.
 - Fill: `secondHandCream` (same color as the needle).
 
-**Optional tip lume dot** (separate `CAShapeLayer` filled circle):
+**Tip lume dot** (separate `CAShapeLayer` filled circle) *(updated Pass 2 — promoted from optional to mandatory)*:
 - Center: at hand-local `(cx, length * 0.78)` (about 78% along the
   needle).
 - Radius: `dialRadius * 0.014`.
@@ -773,9 +895,9 @@ hand in the same cream-gold color family as the GMT hand (NOT silver).
 - Outline: same cream-gold as markers, `lineWidth = max(0.3, dialRadius *
   0.002)`.
 
-This tip dot is OPTIONAL — the reference shows it faintly. If
-implementation complexity is a concern, skip it; the seconds hand reads
-fine without it.
+Pass-2 promotes the tip lume dot to REQUIRED. The needle is thin enough
+(`width = dialRadius * 0.012`) that it's hard to track at 2400×2400, and
+the reference shows the dot clearly. Wire it.
 
 **Fill (needle + pommel):** `secondHandCream = (0.92, 0.84, 0.62, 1.0)` —
 a touch deeper cream than the snowflakes, matching the GMT hand and the
@@ -803,14 +925,17 @@ to the 24h bezel. It runs on a 24-hour scale (one full rotation per 24
 hours, half the rate of the regular hour hand). The arrow tip reaches
 the inner edge of the bezel insert.
 
-**Geometry:**
+**Geometry** *(updated Pass 2 — shaft and arrowhead enlarged for readability)*:
 
 - `length = dialRadius * 0.94` — reaches to `bezelInnerR / dialRadius =
   caseRadius * 0.88 / (caseRadius * 0.80) = 1.10` × dialRadius. So
   length at `dialRadius * 0.94` means the tip sits just inside the
   inner edge of the bezel — which is what the reference shows: the
   arrow tip's POINT touches or barely overlaps the inner bezel rim.
-- `width = dialRadius * 0.022` (thin shaft).
+- `width = dialRadius * 0.028` (shaft). *(updated Pass 2 — was `0.022`;
+  Pass-1 snapshot showed the GMT hand barely readable. Widening the
+  shaft by ~27% gives the hand presence without making it as dominant
+  as the snowflakes.)*
 - `tailFraction = 0.0` (no counterweight on the GMT hand — the
   reference shows none).
 
@@ -819,11 +944,11 @@ the inner edge of the bezel insert.
 The GMT hand is a thin shaft that opens into a **chevron arrowhead** at
 the tip — like a printer's caret `^`. It has NO lozenge.
 
-Define:
+Define *(updated Pass 2 — arrowhead enlarged)*:
 - `cx = width / 2`
-- `arrowBaseY = length * 0.84`  — where the shaft transitions into the arrowhead
+- `arrowBaseY = length * 0.82`  — where the shaft transitions into the arrowhead *(was `0.84`; pulled in slightly to give a longer arrowhead at the new width)*
 - `arrowMidY = length * 0.92`   — broadest point of the arrowhead
-- `arrowHalfWidth = width * 2.4` — arrowhead is wider than the shaft (full = 4.8x shaft width)
+- `arrowHalfWidth = width * 3.0` — arrowhead is wider than the shaft (full width = 6.0× shaft width = `dialRadius * 0.168`). *(updated Pass 2 — was `width * 2.4`. With the wider shaft, this keeps the arrowhead-to-shaft proportions visually similar to the reference while making the head ~60% larger in area.)*
 - `tipY = length`
 - `notchY = length * 0.93` — the inner notch on the back side of the arrowhead (chevron tail)
 - `notchHalfWidth = width * 0.4` (the chevron is a hollow arrow shape — a notch cut into the back)
@@ -954,6 +1079,38 @@ between the window's outer edge and the chamfer's inner edge).
 **Z-order:** above dial face/grain → frame drop shadow → frame fill →
 frame specular → white box → digit.
 
+**Initial digit at `attach()` time** *(updated Pass 2 — fix for the
+"shows 1" flash Caleb reported)*:
+
+Pass-1's `attach()` called `updateDateDigit(day: 0)` which `max(1,
+min(31, day))`-clamps to **"1"**. If the screensaver host captures any
+frame before the first real `tick()` runs, the user sees "1" instead of
+today's date. The math is correct; the bug is the placeholder.
+
+Pass-2 contract: at `attach()` time, before constructing any layers
+that consume the digit, the renderer reads today's day-of-month via
+`Calendar.current.component(.day, from: Date())` (one read, install-time
+only) and seeds `lastRenderedDay` with that value, then renders the
+digit from it. The subsequent `tick()` call inside `attach()` sees
+`day == lastRenderedDay`, no-ops, and the first time-driven update
+happens on the next real tick or day rollover.
+
+This is **not** a P4 violation. The renderer's per-frame loop is still
+purely time-driven via `tick(reduceMotion:)`. The install-time `Date()`
+read happens exactly once, produces a static placeholder, and does not
+influence any subsequent frame. (Treat it identically to reading
+`Date()` once for "what's the current rotation of the hour hand at
+install" — the rotation math is time-driven; the *initial value* is
+seeded from `now`.)
+
+**Why not "empty placeholder until first tick" (option a from the
+prompt):** would leave a visible empty box during a startup window
+that's not guaranteed to be zero. Worse UX than showing today's date.
+
+**Why not "leave as Pass-1 (always shows 1 first)" (option c):** Caleb
+explicitly reported the issue. If it's a one-time flash, fixing it
+costs ~5 lines. Cost/benefit favors the fix.
+
 ---
 
 ## Element 14 — Hand stack proportions summary
@@ -966,7 +1123,10 @@ fractions of `dialRadius`:
 | Hour           | 0.48                  | 0.16   | `lumeCream`     |
 | Minute         | 0.88                  | 0.115  | `lumeCream`     |
 | Second         | 0.92                  | 0.012  | `secondHandCream` |
-| GMT (24h)      | 0.94                  | 0.022  | `gmtHandGold`   |
+| GMT (24h)      | 0.94                  | 0.028  | `gmtHandGold`   |
+
+*(updated Pass 2 — GMT hand width was 0.022; widened to 0.028 for
+readability.)*
 
 The seconds and GMT hands are the longest because they "ride on top" of
 the time hands and extend to the minute track / bezel respectively. The
@@ -1133,7 +1293,12 @@ Moonphase's single silver stipple.
 ---
 
 ## Element 19 — Gold specular highlight gradient (carry-over from
-Asymmetric Moonphase Element 19)
+Asymmetric Moonphase Element 19) *(updated Pass 2 — marked REQUIRED; Pass-1 renderer shipped without it)*
+
+**Status:** REQUIRED in Pass 2. The Pass-1 renderer did not wire
+`applyGoldSpecular` to any element; this is the single biggest reason
+the rendered output reads as "cleanly drawn" rather than "photographed".
+All gold elements must receive this overlay in Pass 2.
 
 Used on: GMT hand, seconds hand, center hub, date frame (both gold
 elements).
@@ -1151,7 +1316,12 @@ elements).
 
 ---
 
-## Element 20 — Lume specular highlight gradient (NEW for this dial)
+## Element 20 — Lume specular highlight gradient (NEW for this dial) *(updated Pass 2 — marked REQUIRED; Pass-1 renderer shipped without it)*
+
+**Status:** REQUIRED in Pass 2. Same reasoning as Element 19 — the lume
+markers and snowflake hands ship flat in Pass-1, which kills the
+"applied lume" reading. Wire `applyLumeSpecular` to every element in
+the lume-cream family.
 
 Used on: snowflake hour hand, snowflake minute hand, hour-dot marker
 group, hour-bar marker group, 12-triangle marker, bezel pip.
@@ -1204,6 +1374,65 @@ pip.
 
 ---
 
+## Element 22 — Bezel sheen revisions (NEW Pass 2)
+
+Pass-1 specced two sheen mechanisms for the bezel:
+
+1. Element 2's "top-edge highlight band" — a stroked arc on the outer
+   edge of the bezel from `60°` to `170°`.
+2. Element 21's "ceramic sheen overlay" — a radial CAGradientLayer
+   masked to the full bezel annulus.
+
+In the rendered snapshot these read combined as a single soft glow,
+which leaves the bezel feeling slightly flat against the reference's
+clearly "rounded ceramic" appearance. The Tudor reference photo shows a
+broad, curved, *directional* highlight tracing the upper-left third of
+the bezel — the kind of highlight you get on a curved surface lit from
+the upper-left.
+
+Pass-2 adds a THIRD sheen element: a **mid-arc directional sheen**
+stroked at the bezel center radius (not the outer edge), with a wider
+linewidth and a tighter angular sweep, to produce the curved-surface
+highlight.
+
+**Implementation (Element 22 — mid-arc ceramic sheen):**
+
+- `CAShapeLayer`, path = arc on circle at radius `(bezelOuterR +
+  bezelInnerR) / 2 = caseRadius * 0.935` (the bezel centerline).
+- Arc sweep: from angle `100°` to `170°` (CCW from +x). Note: `90°` is
+  12 o'clock visual, `180°` is 9 o'clock visual — so this is a tight
+  band sweeping from just left-of-top to just past 9 o'clock, hugging
+  the upper-left of the bezel.
+- `lineWidth = max(1.5, caseRadius * 0.040)` — wide. The sheen fills
+  ~36% of the radial bezel thickness (which is `caseRadius * 0.11`).
+- `strokeColor = (1.00, 1.00, 1.00, 0.18)` — soft. Lower alpha than
+  Element 2's top-edge band so the two layers stack without going
+  chalky.
+- `lineCap = .round` — fades at the ends of the sweep.
+- **No mask needed** beyond the natural lineWidth-bounded stroke (the
+  arc itself doesn't extend past the bezel annulus).
+
+**Stacking with Elements 2 and 21:**
+
+The three sheen layers form a hierarchy:
+
+| Layer                     | Where                  | Effect           |
+|---------------------------|------------------------|------------------|
+| El.21 ceramic sheen       | Full annulus, radial   | Area-light bloom |
+| El.22 mid-arc sheen (NEW) | Bezel centerline arc   | Curved-surface highlight |
+| El.2 top-edge band        | Outer-edge stroked arc | Rim catch-light  |
+
+Together they give the bezel a clear "rounded ceramic lit from the
+upper-left" reading instead of the flat appearance in Pass-1.
+
+**Z-order:** above the black/red halves and the El.21 radial overlay,
+below the top-edge highlight band (Element 2). The full bezel stack
+becomes: black half → red half → El.21 radial sheen → **El.22 mid-arc
+sheen (NEW)** → El.2 top-edge band → inner groove → ticks → numerals →
+pip.
+
+---
+
 ## Implementation order
 
 When wiring this up, build top-down z-order so each element appears as
@@ -1213,8 +1442,9 @@ expected:
 2. Vignette outside the case (optional, ambient).
 3. Case top gradient (steel disc).
 4. Brushed steel overlay (chamfer ring).
-5. Bezel insert: black half → red half → ceramic sheen → top-edge
-   highlight band → inner groove.
+5. Bezel insert: black half → red half → ceramic sheen (Element 21) →
+   **mid-arc sheen (Element 22, new Pass 2)** → top-edge highlight band →
+   inner groove.
 6. Bezel: tick marks at odd hours → numerals at even hours → triangle
    pip (with lume specular).
 7. Polished chamfer ring + outer bezel rim + chamfer/rim glints.
@@ -1240,7 +1470,7 @@ reuse from AsymmetricMoonphasePalette — different design language):
 |---------------------------|---------------------------------------------|----------------------------------|
 | `caseSteel`               | `(0.78, 0.79, 0.82, 1.0)`                   | Mid steel tone                   |
 | `caseSteelHighlight`      | `(0.96, 0.96, 0.97, 1.0)`                   | Polished bright edge             |
-| `caseSteelShadow`         | `(0.42, 0.43, 0.46, 1.0)`                   | Deep case shadow                 |
+| `caseSteelShadow`         | `(0.34, 0.35, 0.38, 1.0)`                   | Deep case shadow *(Pass 2 — darkened from `(0.42, 0.43, 0.46)`)* |
 | `bezelBlack`              | `(0.08, 0.08, 0.09, 1.0)`                   | Ceramic black base               |
 | `bezelBlackHighlight`     | `(0.30, 0.30, 0.32, 1.0)`                   | Ceramic black top catch-light    |
 | `bezelBlackShadow`        | `(0.02, 0.02, 0.03, 1.0)`                   | Ceramic black bottom shadow      |
@@ -1263,7 +1493,8 @@ reuse from AsymmetricMoonphasePalette — different design language):
 | `dateBoxWhite`            | `(0.96, 0.94, 0.88, 1.0)`                   | Warm cream-white date plate      |
 | `dateNumeralBlack`        | `(0.04, 0.04, 0.05, 1.0)`                   | Date digit                       |
 | `dateFrameGold`           | `(0.84, 0.66, 0.34, 1.0)`                   | Date frame fill (gold family)    |
-| `ceramicSheenWhite`       | `(1.00, 1.00, 1.00, 0.20)`                  | Soft white peak on bezel sheen   |
+| `ceramicSheenWhite`       | `(1.00, 1.00, 1.00, 0.20)`                  | Soft white peak on bezel sheen (Element 21) |
+| `ceramicMidArcSheen`      | `(1.00, 1.00, 1.00, 0.18)`                  | Mid-arc directional sheen on bezel centerline (Element 22, new Pass 2) |
 | `chamferShadow`           | `(0.20, 0.20, 0.22, 0.70)`                  | Inner edge dark stroke           |
 
 ---
