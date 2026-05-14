@@ -14,7 +14,7 @@ public enum DialRegistry {
     public static let all: [DialRenderer.Type] = [
         ProofOfHostRenderer.self,
         RoyaleRenderer.self,
-        // Story 1.6: + AsymmetricMoonphaseRenderer.self
+        AsymmetricMoonphaseRenderer.self,
         // Story 2.1: + CokeGMTRenderer.self
         // Story 2.2: + OctagonRenderer.self
         // Story 2.3: + MoonchronoRenderer.self

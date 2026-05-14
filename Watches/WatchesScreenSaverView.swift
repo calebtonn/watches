@@ -172,12 +172,13 @@ final class WatchesScreenSaverView: ScreenSaverView {
     // MARK: Renderer wiring
 
     private func installRenderer() {
-        // Story 1.5 temporarily hardcodes Royale (the dial being stress-tested
-        // against the protocol). Story 1.6 swaps to "asymmetricMoonphase";
-        // Story 3.1 replaces this whole branch with a `ScreenSaverDefaults`
-        // read and a fallback to the first default-visibility dial (P10).
-        guard let dialType = DialRegistry.byID("royale") else {
-            Logging.host.error("Default dial 'royale' not registered; rendering blank canvas.")
+        // Story 1.6 temporarily hardcodes Asymmetric Moonphase (the dial being
+        // stress-tested against the protocol for non-concentric layout). The
+        // next dial story (Coke GMT in Epic 2) flips this to its ID; Story 3.1
+        // replaces this branch with a `ScreenSaverDefaults` read + fallback to
+        // the first default-visibility dial (P10).
+        guard let dialType = DialRegistry.byID("asymmetricMoonphase") else {
+            Logging.host.error("Default dial 'asymmetricMoonphase' not registered; rendering blank canvas.")
             return
         }
 

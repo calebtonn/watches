@@ -45,7 +45,9 @@ targets:
     sources:
       - path: WatchesCore
         excludes:
-          - "**/*.md"   # per-dial notes.md are design documentation, not resources
+          - "**/*.md"          # per-dial notes.md are design docs, not resources
+          - "**/credit.txt"    # per-dial credit.txt is developer-facing; brand
+                                # credit is surfaced via DialIdentity.homageCredit
     settings:
       base:
         PRODUCT_NAME: WatchesCore
