@@ -201,14 +201,49 @@ Addressed Caleb's 7-point critique on the first-pass snapshot:
    right to clear the bigger main time. Power reserve radius `0.26 → 0.18`,
    center pulled inward. Aperture width `0.34 → 0.40 · mainTimeRadius`.
 
+## Polish pass A (post-reference-comparison — 2026-05-13)
+
+After Caleb compared the rendering to the Lange 1 reference photo, we
+landed a second round of changes:
+
+1. **Hands redesigned.** `goldHandPath(taper:withHole:)` now produces a true
+   Lange lance: small lozenge tail behind the pivot (counterweight), slim
+   shaft, lozenge blade near the tip, sharp point. Minute hand gets a circular
+   hole near the pivot (CAShapeLayer `.evenOdd` fill rule). Layer bounds + 
+   anchorPoint adjusted so the tail extends behind the pivot.
+2. **Gold lozenge hour markers** at the 8 non-cardinal positions (1, 2, 4,
+   5, 7, 8, 10, 11) — sculptural diamond shapes pointing radially outward,
+   filled `handGold` with a thin `caseGoldShadow` stroke for edge definition.
+   The hour tick lines at non-cardinals are removed (markers replace them);
+   the 60-tick minute track stays.
+3. **Moonphase rebuilt around sliding the moon disc.** Per the reference
+   photo, the aperture's bottom arches are decorative — they nibble the moon
+   as it transits. We dropped the previous "navy occulter" technique and now:
+   - Maintain a STATIONARY aperture-masked container (`moonphaseDiscContainer`)
+   - Inside it, a MOVING sublayer (`moonphaseMovingLayer`) holds the gold
+     moon disc + man-in-the-moon face
+   - Phase fraction translates the moving layer laterally: `dx = (hw + R) ·
+     (1 - 2·f)`. At f=0 (new moon) the moon is offscreen RIGHT, at f=0.5
+     centered (full), at f=1 offscreen LEFT.
+   - The mask is on the stationary container, so the moon slides past
+     a fixed aperture — exactly the visual mechanism of the real watch.
+   Hills are now SUBTLE (`hillHeight = hw * 0.06`) — they just nibble the
+   moon's bottom edge during transit.
+4. **Moonphase decorations.** 8 four-point gold stars in the peripheral
+   navy regions; man-in-the-moon (two eye dots + curved smile) on the moon
+   disc, parented to the moving layer so it slides with the moon.
+5. **Big date frames** are thinner (`frameInset = h*0.025`), less rounded
+   (`cornerR = h*0.04`), and the two white boxes butt closer (`gap = h*0.025`).
+6. **Power reserve** pulled inward (center `0.62 → 0.55 · dialRadius`) so it
+   sits clearly in the dial face rather than against the bezel. Tick count
+   dropped 12 → 8 for a less-crowded reading; majors at AUF / midpoint / AB.
+
 ## Open follow-ups
 
-- Phase rendering when moon is partly behind the hills: the visible phase
-  shape can be partially clipped by the hill silhouette. Acceptable for
-  Lange-1 "moon over hills" aesthetic, but if Caleb wants stricter phase
-  fidelity we'd need to raise the moon higher OR shorten the hills further.
-- Power reserve indicator hand vs. tick density — currently 12 ticks. If
-  Caleb wants a less-crowded look we could drop to 8 ticks (AUF, AB,
-  midpoint + 5 intermediate).
-- Sub-seconds dial could benefit from a thin engraved boundary line outside
-  the recess gradient for additional skeuomorphic depth.
+- Stars are very small and easy to miss at typical screensaver size. May
+  need to bump star outer radius further (currently `hw * 0.05`).
+- Man-in-the-moon detail is also subtle — could be more pronounced.
+- At certain moon phases (e.g., near new moon), only a thin sliver of moon
+  shows. Visually correct but may want a tiny opacity bump on the navy sky
+  decoration so the aperture doesn't feel empty.
+- Faceplate grain texture (subtle stippling) not yet implemented.

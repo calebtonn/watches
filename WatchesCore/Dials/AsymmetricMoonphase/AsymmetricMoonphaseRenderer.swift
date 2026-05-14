@@ -69,6 +69,7 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
     private let mainTimeOuterRing = CAShapeLayer()
     private let mainTimeNumeralsLayer = CAShapeLayer()
     private let mainTimeTicksLayer = CAShapeLayer()
+    private let mainTimeHourMarkersLayer = CAShapeLayer()   // gold lozenges at 1,2,4,5,7,8,10,11
     private let mainTimeHourHand = CAShapeLayer()
     private let mainTimeMinuteHand = CAShapeLayer()
     private let mainTimeCenterHub = CAShapeLayer()
@@ -77,13 +78,18 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
 
     private let moonphaseClipShape = CAShapeLayer()  // mask for the aperture
     private let moonphaseSkyLayer = CAShapeLayer()    // navy background
-    private let moonphaseDiscLayer = CAShapeLayer()   // gold moon (stationary)
-    private let moonphaseOcculterLayer = CAShapeLayer()  // navy disc that translates over the moon for phase
-    private let moonphaseStarsLayer = CAShapeLayer()  // decorative stars
+    private let moonphaseDiscLayer = CAShapeLayer()   // gold moon
+    private let moonphaseFaceLayer = CAShapeLayer()   // man-in-the-moon (eyes + smile)
+    private let moonphaseStarsLayer = CAShapeLayer()  // decorative gold stars
     private let moonphaseFrameLayer = CAShapeLayer()  // gold rim around the aperture
-    /// Container that holds the moon + occulter; we apply translation to the
-    /// occulter inside this container to fake lunar phases.
+    /// Stationary container holding the aperture clip mask. Its mask must
+    /// NOT translate with the moon, otherwise sliding the moon doesn't
+    /// visibly reveal phases.
     private let moonphaseDiscContainer = CALayer()
+    /// Translates left/right based on phase fraction; child of the stationary
+    /// container. Holds the moon disc + face — they move together past the
+    /// stationary aperture mask above.
+    private let moonphaseMovingLayer = CALayer()
 
     // MARK: Big date window layers
 
@@ -321,6 +327,10 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         mainTimeNumeralsLayer.strokeColor = nil
         caseBackgroundLayer.addSublayer(mainTimeNumeralsLayer)
 
+        mainTimeHourMarkersLayer.fillColor = AsymmetricMoonphasePalette.handGold
+        mainTimeHourMarkersLayer.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        caseBackgroundLayer.addSublayer(mainTimeHourMarkersLayer)
+
         // Moonphase — z-order: sky → stars → disc → clip-mask (applied as
         // layer.mask on a container).
         moonphaseClipShape.fillColor = NSColor.white.cgColor
@@ -332,15 +342,18 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         moonphaseStarsLayer.strokeColor = nil
         caseBackgroundLayer.addSublayer(moonphaseStarsLayer)
 
-        moonphaseDiscContainer.addSublayer(moonphaseDiscLayer)
+        // Moving sublayer inside the stationary aperture-masked container.
+        moonphaseDiscContainer.addSublayer(moonphaseMovingLayer)
+        moonphaseMovingLayer.actions = ["transform": NSNull(), "position": NSNull()]
+        moonphaseMovingLayer.addSublayer(moonphaseDiscLayer)
         moonphaseDiscLayer.fillColor = AsymmetricMoonphasePalette.moonGold
         moonphaseDiscLayer.strokeColor = nil
-        // Occulter rides INSIDE the disc container, on top of the moon disc.
-        // We translate this layer left/right based on the current lunar phase.
-        moonphaseDiscContainer.addSublayer(moonphaseOcculterLayer)
-        moonphaseOcculterLayer.fillColor = AsymmetricMoonphasePalette.moonSky
-        moonphaseOcculterLayer.strokeColor = nil
-        moonphaseOcculterLayer.actions = ["transform": NSNull(), "position": NSNull()]
+        // Man-in-the-moon: two eye dots (filled) + curved smile (stroked).
+        // Parented to moving layer so it slides with the moon disc.
+        moonphaseMovingLayer.addSublayer(moonphaseFaceLayer)
+        moonphaseFaceLayer.fillColor = AsymmetricMoonphasePalette.caseGoldShadow
+        moonphaseFaceLayer.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        moonphaseFaceLayer.lineCap = .round
         caseBackgroundLayer.addSublayer(moonphaseDiscContainer)
 
         // Thin gold frame around the aperture perimeter.
@@ -357,6 +370,7 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
 
         mainTimeMinuteHand.fillColor = AsymmetricMoonphasePalette.handGold
         mainTimeMinuteHand.strokeColor = nil
+        mainTimeMinuteHand.fillRule = .evenOdd       // for the pivot hole
         mainTimeMinuteHand.anchorPoint = CGPoint(x: 0.5, y: 0.0)
         mainTimeMinuteHand.actions = ["transform": NSNull(), "position": NSNull()]
         caseBackgroundLayer.addSublayer(mainTimeMinuteHand)
@@ -534,13 +548,13 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         )
         let subSecondsRadius = dialRadius * 0.20
 
-        // Power reserve — right side, in the negative space between big date
-        // and sub-seconds. Smaller arc + sized for tick-mark display.
+        // Power reserve — right side, pulled inward to match reference photo
+        // (sits clearly within the dial face, not at the bezel edge).
         let powerReserveCenter = CGPoint(
-            x: caseCenter.x + dialRadius * 0.62,
+            x: caseCenter.x + dialRadius * 0.55,
             y: caseCenter.y - dialRadius * 0.02
         )
-        let powerReserveRadius = dialRadius * 0.18
+        let powerReserveRadius = dialRadius * 0.20
 
         anchors = LayoutAnchors(
             caseCenter: caseCenter,
@@ -596,21 +610,10 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         mainTimeOuterRing.path = CGPath(ellipseIn: faceRect, transform: nil)
         mainTimeOuterRing.lineWidth = max(0.5, r * 0.012)
 
-        // Tick marks — long at 4 cardinals, short at others
+        // Hour tick marks are REPLACED at non-cardinals by gold lozenges
+        // (built below in markersPath). Only the minute ticks live in this
+        // layer — small lines around the perimeter, skipping multiples of 5.
         let ticksPath = CGMutablePath()
-        let outerTickR = r * 0.93
-        let shortTickInner = r * 0.85
-        let longTickInner = r * 0.78
-        for i in 0..<12 {
-            let theta = .pi / 2 - (CGFloat(i) / 12) * 2 * .pi
-            let dx = cos(theta)
-            let dy = sin(theta)
-            let isCardinal = i % 3 == 0  // 12, 3, 6, 9
-            let inner = isCardinal ? longTickInner : shortTickInner
-            ticksPath.move(to: CGPoint(x: cx + dx * inner, y: cy + dy * inner))
-            ticksPath.addLine(to: CGPoint(x: cx + dx * outerTickR, y: cy + dy * outerTickR))
-        }
-        // Minute ticks (60 small dots near the rim)
         let minuteTickR = r * 0.97
         let minuteTickInner = r * 0.92
         for i in 0..<60 where i % 5 != 0 {
@@ -624,6 +627,35 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         mainTimeTicksLayer.path = ticksPath
         mainTimeTicksLayer.lineWidth = max(0.5, r * 0.020)
         mainTimeTicksLayer.lineCap = .round
+
+        // Gold lozenge hour markers at the 8 non-cardinal positions
+        // (1, 2, 4, 5, 7, 8, 10, 11). Each is a 4-sided diamond pointing
+        // radially outward from the sub-dial center.
+        let markersPath = CGMutablePath()
+        let markerCenterR = r * 0.83        // distance from sub-dial center
+        let markerLong = r * 0.10           // radial length of the lozenge
+        let markerWide = r * 0.034          // perpendicular width of the lozenge
+        let nonCardinals = [1, 2, 4, 5, 7, 8, 10, 11]
+        for i in nonCardinals {
+            let theta = .pi / 2 - (CGFloat(i) / 12) * 2 * .pi
+            let ux = cos(theta), uy = sin(theta)
+            // perpendicular unit vector (90° CCW)
+            let px = -uy, py = ux
+            let mx = cx + ux * markerCenterR
+            let my = cy + uy * markerCenterR
+            let outer = CGPoint(x: mx + ux * markerLong / 2, y: my + uy * markerLong / 2)
+            let inner = CGPoint(x: mx - ux * markerLong / 2, y: my - uy * markerLong / 2)
+            let left = CGPoint(x: mx + px * markerWide / 2, y: my + py * markerWide / 2)
+            let right = CGPoint(x: mx - px * markerWide / 2, y: my - py * markerWide / 2)
+            markersPath.move(to: outer)
+            markersPath.addLine(to: left)
+            markersPath.addLine(to: inner)
+            markersPath.addLine(to: right)
+            markersPath.closeSubpath()
+        }
+        mainTimeHourMarkersLayer.frame = CGRect(origin: .zero, size: canvas)
+        mainTimeHourMarkersLayer.path = markersPath
+        mainTimeHourMarkersLayer.lineWidth = max(0.3, r * 0.004)
 
         // Roman numerals at 12 / 3 / 6 / 9 — drawn via Core Text glyph paths
         // for crisp serif rendering. (Sub-dial Roman numerals are a Lange 1
@@ -655,18 +687,29 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         mainTimeNumeralsLayer.frame = CGRect(origin: .zero, size: canvas)
         mainTimeNumeralsLayer.path = romansPath
 
-        // Hands
-        let hourLength = r * 0.56
-        let hourWidth = r * 0.075
-        mainTimeHourHand.bounds = CGRect(x: 0, y: 0, width: hourWidth, height: hourLength)
+        // Hands — anchor at the PIVOT (tail extends behind in layer bounds).
+        let tailFrac = Self.handTailFraction
+        let anchorY = tailFrac / (1 + tailFrac)
+
+        let hourLength = r * 0.50
+        let hourWidth = r * 0.11
+        mainTimeHourHand.bounds = CGRect(
+            x: 0, y: 0, width: hourWidth, height: hourLength * (1 + tailFrac)
+        )
+        mainTimeHourHand.anchorPoint = CGPoint(x: 0.5, y: anchorY)
         mainTimeHourHand.position = a.mainTimeCenter
         mainTimeHourHand.path = goldHandPath(width: hourWidth, length: hourLength, taper: true)
 
-        let minuteLength = r * 0.82
-        let minuteWidth = r * 0.05
-        mainTimeMinuteHand.bounds = CGRect(x: 0, y: 0, width: minuteWidth, height: minuteLength)
+        let minuteLength = r * 0.76
+        let minuteWidth = r * 0.08
+        mainTimeMinuteHand.bounds = CGRect(
+            x: 0, y: 0, width: minuteWidth, height: minuteLength * (1 + tailFrac)
+        )
+        mainTimeMinuteHand.anchorPoint = CGPoint(x: 0.5, y: anchorY)
         mainTimeMinuteHand.position = a.mainTimeCenter
-        mainTimeMinuteHand.path = goldHandPath(width: minuteWidth, length: minuteLength, taper: true)
+        mainTimeMinuteHand.path = goldHandPath(
+            width: minuteWidth, length: minuteLength, taper: true, withHole: true
+        )
 
         // Center hub
         let hubR = r * 0.05
@@ -686,7 +729,7 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         let cx = a.moonphaseCenter.x        // baseline center
         let baseY = a.moonphaseCenter.y
         let hw = a.moonphaseHalfWidth
-        // Bounding rect of the aperture: full-width × semicircle-height,
+        // Bounding rect of the aperture: full-width × top-arc-height,
         // rising upward from the baseline.
         let apertureRect = CGRect(x: cx - hw, y: baseY, width: hw * 2, height: hw)
         let aperturePath = buildAperturePath(in: apertureRect)
@@ -695,39 +738,75 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         moonphaseSkyLayer.frame = CGRect(origin: .zero, size: canvas)
         moonphaseSkyLayer.path = aperturePath
 
-        // Stars (decorative): a handful inside the upper region of the aperture.
+        // Stars (decorative 4-point gold stars) sprinkled in the peripheral
+        // navy regions of the aperture — placed where the moon disc does
+        // NOT cover at full-moon position (so they remain visible).
         let starsPath = CGMutablePath()
-        let starR = hw * 0.04
+        let starOuter = hw * 0.05
+        let starInner = starOuter * 0.40
         let starPositions: [(CGFloat, CGFloat)] = [
-            (-0.55, 0.30),
-            (-0.20, 0.65),
-            ( 0.10, 0.85),
-            ( 0.45, 0.55),
-            ( 0.70, 0.25),
+            (-0.78, 0.45),
+            (-0.55, 0.80),
+            (-0.18, 0.92),
+            ( 0.20, 0.94),
+            ( 0.55, 0.82),
+            ( 0.78, 0.46),
+            ( 0.88, 0.20),
+            (-0.88, 0.22),
         ]
         for (fx, fy) in starPositions {
             let sx = cx + fx * hw
             let sy = baseY + fy * hw
-            starsPath.addEllipse(in: CGRect(x: sx - starR, y: sy - starR, width: starR * 2, height: starR * 2))
+            starsPath.addPath(fourPointStar(at: CGPoint(x: sx, y: sy),
+                                            outerRadius: starOuter,
+                                            innerRadius: starInner))
         }
         moonphaseStarsLayer.frame = CGRect(origin: .zero, size: canvas)
         moonphaseStarsLayer.path = starsPath
 
-        // Moon disc — sits stationary inside the aperture, well clear of the
-        // bottom hills. The OCCULTER disc (navy, same size) translates over
-        // the moon to fake lunar phases.
-        let discR = hw * 0.52
-        let moonCenter = CGPoint(x: cx, y: baseY + hw * 0.62)
-        moonphaseDiscContainer.frame = CGRect(
-            x: moonCenter.x - discR, y: moonCenter.y - discR,
+        // Stationary container with the aperture mask. The moon translates
+        // INSIDE this container (via moonphaseMovingLayer), past the
+        // stationary aperture — that's what makes phases visible.
+        let containerRect = apertureRect.insetBy(dx: -hw, dy: 0)
+        moonphaseDiscContainer.frame = containerRect
+        // Mask path in container-local coords.
+        let localApertureRect = apertureRect.offsetBy(
+            dx: -containerRect.origin.x, dy: -containerRect.origin.y
+        )
+        let localAperturePath = buildAperturePath(in: localApertureRect)
+        let containerMask = CAShapeLayer()
+        containerMask.frame = moonphaseDiscContainer.bounds
+        containerMask.path = localAperturePath
+        containerMask.fillColor = NSColor.white.cgColor
+        moonphaseDiscContainer.mask = containerMask
+
+        // Moving layer is the same size as the container (so its coordinate
+        // system matches). The moon sits inside the moving layer at the
+        // "full moon" position; translating the moving layer slides the moon
+        // through the (stationary) aperture mask.
+        moonphaseMovingLayer.frame = moonphaseDiscContainer.bounds
+
+        let discR = hw * 0.46
+        let moonCenterLocal = CGPoint(
+            x: localApertureRect.midX,
+            y: localApertureRect.minY + hw * 0.52
+        )
+        moonphaseDiscLayer.frame = CGRect(
+            x: moonCenterLocal.x - discR, y: moonCenterLocal.y - discR,
             width: discR * 2, height: discR * 2
         )
-        let discBounds = CGRect(origin: .zero, size: moonphaseDiscContainer.bounds.size)
-        moonphaseDiscLayer.frame = discBounds
-        moonphaseDiscLayer.path = CGPath(ellipseIn: discBounds, transform: nil)
+        moonphaseDiscLayer.path = CGPath(
+            ellipseIn: CGRect(origin: .zero, size: moonphaseDiscLayer.bounds.size),
+            transform: nil
+        )
 
-        moonphaseOcculterLayer.frame = discBounds
-        moonphaseOcculterLayer.path = CGPath(ellipseIn: discBounds, transform: nil)
+        // Man-in-the-moon: positioned in moonphaseMovingLayer's coords so it
+        // tracks with the moon disc.
+        moonphaseFaceLayer.frame = moonphaseDiscLayer.frame
+        moonphaseFaceLayer.path = buildMoonFacePath(
+            in: CGRect(origin: .zero, size: moonphaseFaceLayer.bounds.size)
+        )
+        moonphaseFaceLayer.lineWidth = max(0.4, discR * 0.06)
 
         // Gold frame around the aperture perimeter.
         moonphaseFrameLayer.frame = CGRect(origin: .zero, size: canvas)
@@ -736,6 +815,53 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
 
         // Clip the sky, stars, and disc container to the aperture shape.
         applyMoonphaseClip(aperturePath: aperturePath, apertureRect: apertureRect, canvasSize: canvas)
+    }
+
+    /// 4-point star path centered at `c` with the specified outer/inner radii.
+    private func fourPointStar(at c: CGPoint, outerRadius: CGFloat, innerRadius: CGFloat) -> CGPath {
+        let path = CGMutablePath()
+        let nPoints = 4
+        let totalSteps = nPoints * 2
+        for step in 0..<totalSteps {
+            let angle = .pi / 2 + CGFloat(step) * (.pi * 2 / CGFloat(totalSteps))
+            let r = step % 2 == 0 ? outerRadius : innerRadius
+            let p = CGPoint(x: c.x + cos(angle) * r, y: c.y + sin(angle) * r)
+            if step == 0 { path.move(to: p) } else { path.addLine(to: p) }
+        }
+        path.closeSubpath()
+        return path
+    }
+
+    /// Builds the man-in-the-moon "face": two eye dots + a curved smile,
+    /// positioned in the local coordinate space of the moon disc (so the
+    /// path translates with the disc when the disc container moves).
+    private func buildMoonFacePath(in discBounds: CGRect) -> CGPath {
+        let path = CGMutablePath()
+        let cx = discBounds.midX
+        let cy = discBounds.midY
+        let r = discBounds.width / 2
+        let eyeR = r * 0.06
+        let eyeOffsetX = r * 0.30
+        let eyeOffsetY = r * 0.18
+        // Eyes (small filled dots — using strokeColor, lineWidth gives them their look)
+        path.addEllipse(in: CGRect(
+            x: cx - eyeOffsetX - eyeR, y: cy + eyeOffsetY - eyeR,
+            width: eyeR * 2, height: eyeR * 2
+        ))
+        path.addEllipse(in: CGRect(
+            x: cx + eyeOffsetX - eyeR, y: cy + eyeOffsetY - eyeR,
+            width: eyeR * 2, height: eyeR * 2
+        ))
+        // Smile — a downward-opening arc below center (y-up coords: below means smaller y)
+        let smileRadius = r * 0.38
+        path.addArc(
+            center: CGPoint(x: cx, y: cy + r * 0.30),
+            radius: smileRadius,
+            startAngle: -.pi * 0.85,
+            endAngle: -.pi * 0.15,
+            clockwise: false
+        )
+        return path
     }
 
     /// Build the aperture path: top semicircle + scalloped bottom with two
@@ -752,10 +878,12 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         let hw = rect.width / 2
         let topRadius = hw
 
-        // Hill parameters: wide-and-flat, well clear of the moon disc above.
-        let hillHalfWidth = hw * 0.32     // each hill spans 0.64*hw horizontally
-        let hillGap = hw * 0.06           // tiny valley between the two hills
-        let hillHeight = hw * 0.10        // subtle peak height — moon must clear
+        // Hills are SUBTLE — they only need to nibble the bottom of the
+        // moon disc as it slides through. Per the Lange 1 reference, the
+        // arches are barely perceptible (often hidden behind the hands).
+        let hillHalfWidth = hw * 0.30
+        let hillGap = hw * 0.10
+        let hillHeight = hw * 0.06
 
         let rightHillLeft = cx + hillGap
         let rightHillRight = rightHillLeft + hillHalfWidth * 2
@@ -799,9 +927,9 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
     }
 
     private func applyMoonphaseClip(aperturePath: CGPath, apertureRect: CGRect, canvasSize: CGSize) {
-        // Each clipped layer needs its own mask CAShapeLayer. The disc
-        // container has a non-origin frame, so its mask path must be in the
-        // container's LOCAL coordinate space.
+        // Clip the sky + stars to the aperture shape. (Disc-container mask
+        // is set in `layoutMoonphase` itself — it needs a stationary mask in
+        // the container's own local-coord space, independent of canvas.)
         for layer in [moonphaseSkyLayer, moonphaseStarsLayer] {
             let mask = CAShapeLayer()
             mask.frame = CGRect(origin: .zero, size: canvasSize)
@@ -809,34 +937,23 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
             mask.fillColor = NSColor.white.cgColor
             layer.mask = mask
         }
-        // Disc container: rebuild the aperture path in local coords.
-        let containerOrigin = moonphaseDiscContainer.frame.origin
-        let localRect = apertureRect.offsetBy(dx: -containerOrigin.x, dy: -containerOrigin.y)
-        let localPath = buildAperturePath(in: localRect)
-        let discMask = CAShapeLayer()
-        discMask.frame = moonphaseDiscContainer.bounds
-        discMask.path = localPath
-        discMask.fillColor = NSColor.white.cgColor
-        moonphaseDiscContainer.mask = discMask
     }
 
     private func updateMoonphaseTransform(fraction: Double) {
-        // Two-disc technique: a stationary gold moon + a navy occulter that
-        // slides over it. The occulter's horizontal offset is piecewise-linear
-        // in phase fraction so the visible-moon area matches actual lunar
-        // appearance (northern hemisphere orientation — waxing crescent is
-        // bright on the RIGHT, waning is bright on the LEFT).
-        guard anchors != nil else { return }
+        // Slide the moon disc laterally past the (stationary) aperture mask.
+        // The disc container is masked — translating the moving sublayer
+        // makes the moon enter, transit, and exit the aperture.
+        //
+        // Direction convention (northern-hemisphere): at f=0 (new moon) the
+        // moon is offscreen to the RIGHT. As f → 0.5 it slides leftward into
+        // the aperture, fully visible (full moon) at center. As f → 1.0 it
+        // continues leftward and exits to the LEFT.
+        guard let a = anchors else { return }
+        let hw = a.moonphaseHalfWidth
         let discR = moonphaseDiscLayer.bounds.width / 2
-        let dx: CGFloat
-        if fraction <= 0.5 {
-            // Waxing 0 → 0.5: occulter slides from center to far-left.
-            dx = -CGFloat(4.0) * discR * CGFloat(fraction)
-        } else {
-            // Waning 0.5 → 1.0: occulter slides from far-right back to center.
-            dx = CGFloat(4.0) * discR * CGFloat(1.0 - fraction)
-        }
-        moonphaseOcculterLayer.setAffineTransform(CGAffineTransform(translationX: dx, y: 0))
+        let xMax = hw + discR
+        let dx = xMax * CGFloat(1.0 - 2.0 * fraction)
+        moonphaseMovingLayer.setAffineTransform(CGAffineTransform(translationX: dx, y: 0))
     }
 
     // MARK: Big date layout
@@ -845,12 +962,14 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         let cx = a.bigDateCenter.x
         let cy = a.bigDateCenter.y
         let h = a.bigDateHeight
-        // Two side-by-side rectangles. Each ~0.75h wide, with a thin gap.
-        let boxW = h * 0.78
-        let gap = h * 0.06
+        // Two side-by-side rectangles, butting up close, with a thin gold
+        // frame border. Lange-1 date numerals sit in near-rectangular boxes
+        // with minimal rounding.
+        let boxW = h * 0.80
+        let gap = h * 0.025
         let totalW = boxW * 2 + gap
-        let cornerR = h * 0.10
-        let frameInset = h * 0.05
+        let cornerR = h * 0.04            // much less rounding
+        let frameInset = h * 0.025         // thin gold frame edge
 
         let box1Rect = CGRect(
             x: cx - totalW / 2, y: cy - h / 2,
@@ -1047,14 +1166,13 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         powerReserveABAngle = abAngle
         powerReservePivot = CGPoint(x: cx, y: cy)
 
-        // Tick marks along the arc path — no continuous arc. Major ticks at
-        // AUF, midpoint, AB; minor ticks evenly between. (Matches the real
-        // Lange 1's discrete graduation, not a printed arc.)
+        // Tick marks along the arc path. Fewer ticks (8 segments → 9 lines)
+        // for a less-crowded reading; majors at AUF / midpoint / AB.
         let ticksPath = CGMutablePath()
-        let tickCount = 12
+        let tickCount = 8
         let tickOuter = r
-        let minorInner = r * 0.90
-        let majorInner = r * 0.82
+        let minorInner = r * 0.91
+        let majorInner = r * 0.83
         for i in 0...tickCount {
             let t = CGFloat(i) / CGFloat(tickCount)
             let angle = aufAngle - t * (aufAngle - abAngle)
@@ -1114,11 +1232,15 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         powerReserveLabelsLayer.frame = CGRect(origin: .zero, size: canvas)
         powerReserveLabelsLayer.path = labelsPath
 
-        // Indicator hand — anchored at the pivot. Slim lance, reaches the
-        // inner tick line.
-        let handLength = r * 0.78
-        let handWidth = r * 0.14
-        powerReserveIndicatorHand.bounds = CGRect(x: 0, y: 0, width: handWidth, height: handLength)
+        // Indicator hand — slim lance with counterweight tail.
+        let tailFrac = Self.handTailFraction
+        let anchorY = tailFrac / (1 + tailFrac)
+        let handLength = r * 0.74
+        let handWidth = r * 0.18
+        powerReserveIndicatorHand.bounds = CGRect(
+            x: 0, y: 0, width: handWidth, height: handLength * (1 + tailFrac)
+        )
+        powerReserveIndicatorHand.anchorPoint = CGPoint(x: 0.5, y: anchorY)
         powerReserveIndicatorHand.position = a.powerReserveCenter
         powerReserveIndicatorHand.path = goldHandPath(width: handWidth, length: handLength, taper: true)
     }
@@ -1194,34 +1316,59 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         return path.isEmpty ? nil : path
     }
 
-    /// Lance / spear-tip hand path. `width` × `length` with anchor at bottom-center.
-    /// If `taper`, produces an elongated arrowhead: wide tail, narrow shaft,
-    /// widening spear-blade near the tip, sharp point (Lange 1 hour/minute hand).
-    /// If not, produces a slim leaf-shape (sub-seconds hand).
-    private func goldHandPath(width: CGFloat, length: CGFloat, taper: Bool) -> CGPath {
+    /// Lange-1 lance hand path. `width` is the diamond's peak width, `length`
+    /// is forward-from-pivot reach. The path also includes a counterweight
+    /// tail of `tailFraction × length` extending behind the pivot, and
+    /// optionally a circular hole/ring near the pivot (minute-hand signature).
+    /// Anchor is at the PIVOT (not the bottom of the path). Callers must set
+    /// `layer.anchorPoint.y = tailFraction / (1 + tailFraction)`.
+    private func goldHandPath(
+        width: CGFloat,
+        length: CGFloat,
+        taper: Bool,
+        withHole: Bool = false
+    ) -> CGPath {
         let path = CGMutablePath()
         let cx = width / 2
         if taper {
-            let tailHalf = width * 0.50      // wide rounded tail behind pivot
-            let shaftHalf = width * 0.18     // slim shaft
-            let bladeHalf = width * 0.50     // spear shoulder near tip
-            let shaftTopY = length * 0.62    // shaft transitions into blade here
-            let bladeMaxY = length * 0.78    // widest point of blade
-            // Clockwise from bottom-left tail
-            path.move(to: CGPoint(x: cx - tailHalf, y: length * 0.02))
-            path.addLine(to: CGPoint(x: cx - tailHalf, y: length * 0.08))
-            path.addLine(to: CGPoint(x: cx - shaftHalf, y: length * 0.16))
-            path.addLine(to: CGPoint(x: cx - shaftHalf, y: shaftTopY))
-            path.addLine(to: CGPoint(x: cx - bladeHalf, y: bladeMaxY))
-            path.addLine(to: CGPoint(x: cx, y: length))
-            path.addLine(to: CGPoint(x: cx + bladeHalf, y: bladeMaxY))
-            path.addLine(to: CGPoint(x: cx + shaftHalf, y: shaftTopY))
-            path.addLine(to: CGPoint(x: cx + shaftHalf, y: length * 0.16))
-            path.addLine(to: CGPoint(x: cx + tailHalf, y: length * 0.08))
-            path.addLine(to: CGPoint(x: cx + tailHalf, y: length * 0.02))
+            let tailL = length * Self.handTailFraction
+            let totalL = length + tailL
+            let shaftW = width * 0.16            // slim shaft
+            let tailW = width * 0.52             // small lozenge at the tail end
+            let diamondW = width                 // peak blade width = input width
+            let diamondStartY = tailL + length * 0.50
+            let diamondPeakY = tailL + length * 0.74
+            let tipNarrowY = tailL + length * 0.92
+            let tipY = tailL + length
+
+            // Tail tip at the bottom of the path
+            path.move(to: CGPoint(x: cx, y: 0))
+            path.addLine(to: CGPoint(x: cx + tailW / 2, y: tailL * 0.55))
+            path.addLine(to: CGPoint(x: cx + shaftW / 2, y: tailL))
+            path.addLine(to: CGPoint(x: cx + shaftW / 2, y: diamondStartY))
+            path.addLine(to: CGPoint(x: cx + diamondW / 2, y: diamondPeakY))
+            path.addLine(to: CGPoint(x: cx + shaftW / 3, y: tipNarrowY))
+            path.addLine(to: CGPoint(x: cx, y: tipY))
+            path.addLine(to: CGPoint(x: cx - shaftW / 3, y: tipNarrowY))
+            path.addLine(to: CGPoint(x: cx - diamondW / 2, y: diamondPeakY))
+            path.addLine(to: CGPoint(x: cx - shaftW / 2, y: diamondStartY))
+            path.addLine(to: CGPoint(x: cx - shaftW / 2, y: tailL))
+            path.addLine(to: CGPoint(x: cx - tailW / 2, y: tailL * 0.55))
+            _ = totalL
             path.closeSubpath()
+
+            if withHole {
+                // Hole/ring near pivot — Lange 1 minute-hand signature. With
+                // .evenOdd fill rule, this circle is subtracted from the body.
+                let holeR = shaftW * 1.6
+                let holeY = tailL + holeR * 1.4
+                path.addEllipse(in: CGRect(
+                    x: cx - holeR, y: holeY - holeR,
+                    width: holeR * 2, height: holeR * 2
+                ))
+            }
         } else {
-            // Slim leaf-shape with a pointed tip — for the sub-seconds hand
+            // Slim needle with a pointed tip — sub-seconds hand (no tail).
             let baseHalf = width * 0.40
             path.move(to: CGPoint(x: cx - baseHalf, y: 0))
             path.addLine(to: CGPoint(x: cx + baseHalf, y: 0))
@@ -1232,4 +1379,8 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         }
         return path
     }
+
+    /// Fraction of forward length that the counterweight tail extends behind
+    /// the pivot for tapered (Lange-style) hands. Tail is small but visible.
+    private static let handTailFraction: CGFloat = 0.22
 }
