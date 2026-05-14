@@ -23,6 +23,10 @@ final class WatchesScreenSaverView: ScreenSaverView {
     private var powerStateObserver: NSObjectProtocol?
     private var exitWatchdog: ExitWatchdog?
 
+    /// Prefs sheet — built lazily on first `configureSheet()`, retained so
+    /// repeat opens don't leak / rebuild from scratch. (Story 3.1.)
+    private var preferencesController: WatchesPreferencesController?
+
     /// Identity of the `CALayer` instance the renderer is currently attached to.
     /// If AppKit recreates `self.layer` (display reconfiguration, pause/resume),
     /// this reference stays pointing at the old (now-orphaned) layer and we
@@ -172,14 +176,18 @@ final class WatchesScreenSaverView: ScreenSaverView {
     // MARK: Renderer wiring
 
     private func installRenderer() {
-        // Story 1.6 temporarily hardcodes Asymmetric Moonphase (the dial being
-        // stress-tested against the protocol for non-concentric layout). The
-        // next dial story (Coke GMT in Epic 2) flips this to its ID; Story 3.1
-        // replaces this branch with a `ScreenSaverDefaults` read + fallback to
-        // the first default-visibility dial (P10).
-        guard let dialType = DialRegistry.byID("asymmetricMoonphase") else {
-            Logging.host.error("Default dial 'asymmetricMoonphase' not registered; rendering blank canvas.")
-            return
+        // Story 3.1: read `selectedDialID` from `ScreenSaverDefaults`,
+        // resolve to a registered dial type with fallback to
+        // `DialPreferences.fallbackDialID` (asymmetricMoonphase) when the
+        // stored ID is missing, empty, or unregistered. Logged at .info
+        // per P10 — corrupted-defaults is a degraded state, not a crash.
+        let defaults: DefaultsBacking = preferencesDefaults()
+        let storedID = DialPreferences.storedDialID(in: defaults)
+        let dialType = DialPreferences.resolveSelectedDialType(id: storedID)
+        if let storedID, storedID != dialType.identity.id {
+            Logging.host.info(
+                "selectedDialID '\(storedID, privacy: .public)' not registered; falling back to '\(dialType.identity.id, privacy: .public)'."
+            )
         }
 
         // Per P10: do not silently attach to a detached fallback CALayer.
@@ -196,6 +204,40 @@ final class WatchesScreenSaverView: ScreenSaverView {
         self.rendererAttachedTo = hostLayer
 
         Logging.host.info("Installed renderer: \(dialType.identity.displayName, privacy: .public)")
+    }
+
+    /// Returns the `ScreenSaverDefaults` instance scoped to this screensaver
+    /// bundle, falling back to `UserDefaults.standard` if the framework
+    /// can't produce one (defensive — should never happen in production).
+    private func preferencesDefaults() -> DefaultsBacking {
+        if let bundleID = Bundle(for: type(of: self)).bundleIdentifier,
+           let ssd = ScreenSaverDefaults(forModuleWithName: bundleID) {
+            return ssd
+        }
+        return UserDefaults.standard
+    }
+
+    // MARK: Configure sheet (Story 3.1)
+
+    override var hasConfigureSheet: Bool { true }
+
+    override var configureSheet: NSWindow? {
+        if preferencesController == nil {
+            let controller = WatchesPreferencesController(defaults: preferencesDefaults())
+            controller.onDone = { [weak self] in
+                guard let self, let sheet = self.preferencesController?.window else { return }
+                if let parent = sheet.sheetParent {
+                    parent.endSheet(sheet)
+                } else {
+                    sheet.orderOut(nil)
+                }
+            }
+            preferencesController = controller
+        }
+        // Re-read defaults each time the sheet opens — the user might have
+        // changed the selection in a prior session.
+        preferencesController?.reloadDialList()
+        return preferencesController?.window
     }
 
     // MARK: Display link

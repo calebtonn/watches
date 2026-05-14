@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// Static registry of all `DialRenderer` types in the bundle.
@@ -33,5 +34,21 @@ public enum DialRegistry {
     /// user's `selectedDialID` from `ScreenSaverDefaults`.
     public static func byID(_ id: String) -> DialRenderer.Type? {
         all.first { $0.identity.id == id }
+    }
+
+    /// Loads the picker thumbnail for a registered dial from its home bundle.
+    /// Returns `nil` if `previewAssetName` is empty (hidden dials marked as
+    /// "no thumbnail") or if the resource can't be found.
+    ///
+    /// Per the per-dial-unique-filename convention established in Story 1.6,
+    /// the `previewAssetName` matches the actual PNG filename on disk (e.g.
+    /// `"royale-preview"` → `royale-preview.png` in the Royale source dir).
+    public static func previewImage(for dialType: DialRenderer.Type) -> NSImage? {
+        let name = dialType.identity.previewAssetName
+        guard !name.isEmpty else { return nil }
+        // `DialRenderer: AnyObject` — all conformers are classes, so the
+        // cast to AnyClass is always safe.
+        let cls: AnyClass = dialType as AnyClass
+        return Bundle(for: cls).image(forResource: name)
     }
 }
