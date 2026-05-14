@@ -268,12 +268,14 @@ public final class CokeGMTRenderer: DialRenderer {
         bezelCeramicSheen.lineCap = .round
         canvasBackground.addSublayer(bezelCeramicSheen)
 
-        // Pass-2 Element 22: mid-arc directional sheen at the bezel
-        // centerline. Stacks with the top-edge band + radial bloom to
-        // give the ceramic its "rounded surface lit from upper-left"
-        // reading.
+        // Pass-2 Element 22 (toned down in Pass 3.2 — was competing
+        // with the sapphire-crystal effect for the upper-left "where's
+        // the bright highlight" eye-catch). Reduced from alpha 0.18 to
+        // 0.10 so the bezel reads as a curved ceramic surface but the
+        // crystal effect on the inner ring stays the dominant
+        // translucent feature.
         bezelMidArcSheen.fillColor = nil
-        bezelMidArcSheen.strokeColor = NSColor(white: 1.0, alpha: 0.18).cgColor
+        bezelMidArcSheen.strokeColor = NSColor(white: 1.0, alpha: 0.10).cgColor
         bezelMidArcSheen.lineCap = .round
         canvasBackground.addSublayer(bezelMidArcSheen)
 
@@ -313,28 +315,26 @@ public final class CokeGMTRenderer: DialRenderer {
         chamferRingLayer.strokeColor = NSColor(white: 0.0, alpha: 0.45).cgColor
         canvasBackground.addSublayer(chamferRingLayer)
 
-        // Pass-3: sapphire crystal annulus (between dialRadius and
-        // bezelInnerR). A translucent CAGradientLayer that brightens
-        // toward the upper-left to suggest the glass dome catching light.
+        // Pass 3.2: crystalGlassLayer + crystalRimHighlight are configured
+        // here but ADDED LATER (after dialFaceLayer + grain) so they
+        // render ABOVE the dial-black background, making the
+        // translucent gradient read as "glass-over-dial" rather than
+        // "silver ring against canvas". See the "// crystal install
+        // (post-dial)" block below.
         crystalGlassLayer.type = .axial
         crystalGlassLayer.startPoint = CGPoint(x: 0.20, y: 1.00)
         crystalGlassLayer.endPoint = CGPoint(x: 0.85, y: 0.05)
         crystalGlassLayer.colors = [
-            NSColor(white: 1.0, alpha: 0.28).cgColor,
-            NSColor(white: 1.0, alpha: 0.10).cgColor,
+            NSColor(white: 1.0, alpha: 0.38).cgColor,    // boosted from 0.28
+            NSColor(white: 1.0, alpha: 0.14).cgColor,
             NSColor(white: 1.0, alpha: 0.0).cgColor,
-            NSColor(white: 0.6, alpha: 0.08).cgColor,
+            NSColor(white: 0.6, alpha: 0.10).cgColor,
         ]
         crystalGlassLayer.locations = [0.0, 0.35, 0.65, 1.0]
-        canvasBackground.addSublayer(crystalGlassLayer)
 
-        // Pass-3: bright refraction arc on the upper-left rim of the
-        // crystal — the bright sliver where studio light catches the
-        // domed edge of the sapphire glass.
         crystalRimHighlight.fillColor = nil
-        crystalRimHighlight.strokeColor = NSColor(white: 1.0, alpha: 0.65).cgColor
+        crystalRimHighlight.strokeColor = NSColor(white: 1.0, alpha: 0.78).cgColor
         crystalRimHighlight.lineCap = .round
-        canvasBackground.addSublayer(crystalRimHighlight)
 
         polishedRimLayer.fillColor = nil
         polishedRimLayer.strokeColor = CokeGMTPalette.caseSteelHighlight
@@ -374,6 +374,13 @@ public final class CokeGMTRenderer: DialRenderer {
         dialGrainLayer.contentsGravity = .resize
         dialGrainLayer.opacity = 0.04
         canvasBackground.addSublayer(dialGrainLayer)
+
+        // crystal install (post-dial). Sapphire crystal annulus + its
+        // refraction rim highlight are added AFTER the dial face so they
+        // overlay the dial-black background — reads as transparent glass
+        // showing the dial through, not silver chamfer.
+        canvasBackground.addSublayer(crystalGlassLayer)
+        canvasBackground.addSublayer(crystalRimHighlight)
 
         // Minute track.
         minuteTrackMinorTicks.fillColor = nil
@@ -774,18 +781,33 @@ public final class CokeGMTRenderer: DialRenderer {
         innerEdgeStroke.path = CGPath(ellipseIn: dialRect, transform: nil)
         innerEdgeStroke.lineWidth = max(0.4, caseRadius * 0.003)
 
-        // Dial face fill.
+        // Pass 3.2: the dial face NOW EXTENDS to bezelInnerR (not the
+        // smaller dialRadius). This means the chamfer annulus where the
+        // sapphire crystal lives is filled with dial-black underneath,
+        // so the crystal's translucent gradient overlay reads as
+        // "glass-over-dial" rather than "silver-grey ring" (which is
+        // what happened when the crystal painted against the canvas
+        // background). Markers/hands stay positioned via `dialRadius`
+        // (0.78) so the dial composition isn't disturbed.
+        let dialFaceR = bezelInnerR
+        let dialFaceRect = CGRect(
+            x: caseCenter.x - dialFaceR, y: caseCenter.y - dialFaceR,
+            width: dialFaceR * 2, height: dialFaceR * 2
+        )
         dialFaceLayer.frame = CGRect(origin: .zero, size: canvas)
-        dialFaceLayer.path = CGPath(ellipseIn: dialRect, transform: nil)
+        dialFaceLayer.path = CGPath(ellipseIn: dialFaceRect, transform: nil)
 
-        // Dial vignette gradient masked to dial.
-        dialVignetteLayer.frame = dialRect
+        // Dial vignette extends to the new dial-face size too.
+        dialVignetteLayer.frame = dialFaceRect
         let vMask = CAShapeLayer()
         vMask.frame = dialVignetteLayer.bounds
-        vMask.path = CGPath(ellipseIn: CGRect(origin: .zero, size: dialRect.size), transform: nil)
+        vMask.path = CGPath(ellipseIn: CGRect(origin: .zero, size: dialFaceRect.size), transform: nil)
         vMask.fillColor = NSColor.white.cgColor
         dialVignetteLayer.mask = vMask
 
+        // Grain stays at dialRadius (the textural matte black is only
+        // on the main dial area where markers live, not in the crystal
+        // annulus).
         dialGrainLayer.frame = dialRect
         let gMask = CAShapeLayer()
         gMask.frame = dialGrainLayer.bounds
