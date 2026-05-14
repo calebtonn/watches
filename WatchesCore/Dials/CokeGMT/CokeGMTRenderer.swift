@@ -636,10 +636,10 @@ public final class CokeGMTRenderer: DialRenderer {
         bezelNumeralsLayer.frame = CGRect(origin: .zero, size: canvas)
         bezelNumeralsLayer.path = numeralsPath
 
-        // Triangle pip at 24/00 (top, angle π/2). Pass-3.3: larger again.
+        // Triangle pip at 24/00 (top, angle π/2). Pass-3.4: larger again.
         let pipTipR = bezelInnerR + caseRadius * 0.012
-        let pipBaseR = bezelInnerR + caseRadius * 0.075
-        let pipHalfW = caseRadius * 0.045
+        let pipBaseR = bezelInnerR + caseRadius * 0.105
+        let pipHalfW = caseRadius * 0.060
         let pipPath = CGMutablePath()
         let pipTip = CGPoint(x: caseCenter.x, y: caseCenter.y + pipTipR)
         let pipR = CGPoint(x: caseCenter.x + pipHalfW, y: caseCenter.y + pipBaseR)
