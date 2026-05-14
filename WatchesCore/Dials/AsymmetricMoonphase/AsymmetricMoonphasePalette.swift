@@ -30,7 +30,13 @@ public enum AsymmetricMoonphasePalette {
     ).cgColor
 
     public static let caseRim: CGColor = NSColor(
-        srgbRed: 1.00, green: 0.94, blue: 0.78, alpha: 1.0
+        srgbRed: 1.00, green: 0.96, blue: 0.82, alpha: 1.0
+    ).cgColor
+
+    /// Brighter cream-gold top-arc edge highlight (catches the studio key
+    /// light along the upper edge of the bezel).
+    public static let caseRimTopArc: CGColor = NSColor(
+        srgbRed: 1.00, green: 0.98, blue: 0.88, alpha: 0.85
     ).cgColor
 
     /// Engraved inner lip at the bezel/dial boundary (semi-transparent).
@@ -53,9 +59,19 @@ public enum AsymmetricMoonphasePalette {
         srgbRed: 0.965, green: 0.955, blue: 0.925, alpha: 1.0
     ).cgColor
 
-    /// Recessed-edge shadow tone (semi-transparent so it blends with the face).
+    /// Recessed-edge shadow tone — deeper for a stronger well effect.
     public static let subDialShadow: CGColor = NSColor(
-        srgbRed: 0.55, green: 0.50, blue: 0.40, alpha: 0.70
+        srgbRed: 0.42, green: 0.36, blue: 0.26, alpha: 0.85
+    ).cgColor
+
+    /// Faint warm stroke for concentric sub-dial guilloché rings.
+    public static let subDialGuilloche: CGColor = NSColor(
+        srgbRed: 0.55, green: 0.50, blue: 0.40, alpha: 0.10
+    ).cgColor
+
+    /// Slightly heavier inner-track separator ring on the sub-seconds dial.
+    public static let subDialInnerTrack: CGColor = NSColor(
+        srgbRed: 0.55, green: 0.50, blue: 0.40, alpha: 0.25
     ).cgColor
 
     // MARK: Hands + numerals + tick marks — gold "applied" alloy
@@ -64,6 +80,21 @@ public enum AsymmetricMoonphasePalette {
     /// frames, aperture rim — every "applied" gold element shares this tone.
     public static let handGold: CGColor = NSColor(
         srgbRed: 0.86, green: 0.68, blue: 0.36, alpha: 1.0
+    ).cgColor
+
+    /// Specular highlight gradient stops for the gold elements. Applied as
+    /// a 4-stop axial gradient sweeping diagonal upper-left → lower-right
+    /// across each gold element, masked to the element's path.
+    public static let handGoldSpecularHi: CGColor = NSColor(
+        srgbRed: 1.00, green: 0.92, blue: 0.72, alpha: 0.55
+    ).cgColor
+
+    public static let handGoldSpecularMid: CGColor = NSColor(
+        srgbRed: 0.96, green: 0.82, blue: 0.52, alpha: 0.22
+    ).cgColor
+
+    public static let handGoldSpecularLo: CGColor = NSColor(
+        srgbRed: 0.36, green: 0.22, blue: 0.08, alpha: 0.35
     ).cgColor
 
     /// Near-black printed text/tick color (slightly translucent so it doesn't
@@ -88,13 +119,13 @@ public enum AsymmetricMoonphasePalette {
         srgbRed: 0.95, green: 0.82, blue: 0.50, alpha: 1.0
     ).cgColor
 
-    /// Darker bronze for the man-in-the-moon eye dots + smile arc.
+    /// Deeper bronze for the man-in-the-moon eye dots + smile arc.
     public static let moonFaceBronze: CGColor = NSColor(
-        srgbRed: 0.55, green: 0.36, blue: 0.16, alpha: 1.0
+        srgbRed: 0.48, green: 0.28, blue: 0.10, alpha: 1.0
     ).cgColor
 
     public static let starGold: CGColor = NSColor(
-        srgbRed: 1.00, green: 0.92, blue: 0.62, alpha: 1.0
+        srgbRed: 1.00, green: 0.95, blue: 0.72, alpha: 1.0
     ).cgColor
 
     // MARK: Big date window

@@ -22,13 +22,27 @@ flat — there is a barely-perceptible recess depth (~0.6% of dial radius
 in virtual space, sold by gradient shading + perimeter shadow ring, not a
 real Z-translation).
 
-**Layout intent:** the four readouts are positioned so the dial looks
-distinctly Lange-1 asymmetric, not a generic 3-counter chronograph:
+**Photorealism stack (updated Pass E2 — read this before the elements):**
+Photorealism on this dial comes from FIVE overlay passes stacking on every
+gold element and every recessed surface. They are tiny individually; their
+sum is the difference between "flat illustration with shadows" and "studio
+photo of a watch." For every gold element below — hands, markers, Romans,
+hub, date frames, aperture rim, moon disc — assume these are applied as
+described in Element 18 (faceplate stipple), Element 19 (gold specular
+highlight gradient), and Element 20 (sub-dial guilloché).
 
-- Main time (large) — center-LEFT, ~50% of dial radius
-- Big date (two boxes) — TOP-RIGHT, abutting the main time at its
-  upper-right corner
-- Sub-seconds (small) — BOTTOM-RIGHT
+**Layout intent (updated Pass E2 — re-measured against primary reference):**
+the four readouts are positioned so the dial looks distinctly Lange-1
+asymmetric, not a generic 3-counter chronograph:
+
+- Main time (large) — center-LEFT, **~48% of dial radius** (smaller than
+  prior 55%; reference shows the main dial fitting comfortably within the
+  left half with clear breathing room toward the bezel and toward the date)
+- Big date (two boxes) — **TOP-RIGHT, sitting HIGH on the dial** with its
+  baseline well above the dial midline; abuts the main time at the upper
+  right but with a clear vertical gap (the reference places the date near
+  the top quarter of the dial, not at the midline)
+- Sub-seconds (small) — BOTTOM-RIGHT, well clear of the dial edge
 - Power reserve (arc) — RIGHT edge, vertical span
 
 ---
@@ -57,10 +71,27 @@ warm-gold band with a smooth vertical gradient.
       — `caseGold` proper.
     - `1.00` → `NSColor(srgbRed: 0.42, green: 0.30, blue: 0.16, alpha: 1.0)`
       — deep bottom shadow (rename `caseGoldShadow`).
-- **Outer rim highlight (silhouette pop):** a `CAShapeLayer` stroking the
-  outer circle (radius = `caseRadius`).
-  - `lineWidth = max(0.5, caseRadius * 0.004)`
-  - `strokeColor = NSColor(srgbRed: 1.00, green: 0.94, blue: 0.78, alpha: 1.0)`
+- **Outer rim highlight (silhouette pop) (updated Pass E2 — crisper):**
+  a `CAShapeLayer` stroking the outer circle (radius = `caseRadius`).
+  - `lineWidth = max(0.8, caseRadius * 0.006)` (raised from 0.004 — too
+    thin in prior to register against the dark background).
+  - `strokeColor = NSColor(srgbRed: 1.00, green: 0.96, blue: 0.82, alpha:
+    1.0)` (a touch brighter / whiter — this is the polished metal edge
+    catching the studio key light).
+- **Bezel top-arc highlight (NEW Pass E2 — catches the light):** a second
+  `CAShapeLayer` drawing a SHORT arc along the upper-left of the bezel,
+  positioned just inside the outer rim. This is the bright glint where
+  the rounded bezel edge faces the light source.
+  - Path: arc on circle radius `caseRadius * 0.992`, from angle
+    `120° (2π/3)` to angle `60° (π/3)` measured CCW from +x — i.e. the
+    upper arc spanning the top-left to top-center of the bezel.
+  - `lineWidth = max(1.0, caseRadius * 0.010)`
+  - `strokeColor = NSColor(srgbRed: 1.00, green: 0.98, blue: 0.88, alpha:
+    0.85)` — bright cream, slightly translucent so it blends.
+  - `lineCap = .round` — the arc fades softly at each end.
+  - Add `shadowOpacity = 0` (no shadow on a highlight).
+  - Z-order: above bezel fill, above outer rim highlight, below inner
+    lip.
 - **Inner lip (where bezel meets dial face):** a `CAShapeLayer` stroking
   the inner circle (radius = `dialRadius`).
   - `lineWidth = max(0.5, caseRadius * 0.007)`
@@ -93,13 +124,14 @@ specular highlights belong on the faceplate.
     - `0.70` → `NSColor(white: 1.0, alpha: 0.0)` — neutral.
     - `1.00` → `NSColor(srgbRed: 0.55, green: 0.50, blue: 0.40, alpha:
       0.18)` — warm shadow at the bezel transition.
-- **Stippling texture (optional but recommended):** a `CALayer` at the
-  faceplate position with `backgroundColor = .clear` and a single
-  noise-pattern `CGImage` as its `contents`, `opacity = 0.06`. Generate
-  the pattern once at attach time by filling a 256×256 buffer with
-  small low-contrast dots (use `CIRandomGenerator` or a manual stipple).
-  If the implementation skips this, the dial still reads as matte
-  because there's no specular highlight on it.
+- **Stippling texture (updated Pass E2 — now MANDATORY, see Element 18
+  for the full implementation spec):** a `CALayer` at the faceplate
+  position with `backgroundColor = .clear` and a procedurally-generated
+  noise-pattern `CGImage` as its `contents`, `opacity = 0.07`. Generate
+  the pattern once at attach time per Element 18 (512×512 buffer, ~6000
+  random low-alpha dots, optional Gaussian blur 0.5). This is the
+  difference between "flat painted disc" and "matte sandblasted plate" —
+  do not skip.
 - **Z-order:** dial face → vignette overlay → (stippling) → all
   sub-dial layers above.
 
@@ -113,28 +145,39 @@ DOES get a soft radial highlight, but a gentle one — this is not a
 sunburst-bright sub-dial, it's a flat polished plate that's barely
 brighter than the main faceplate).
 
-- **Center:** `(caseCenter.x + dialRadius * -0.18, caseCenter.y +
-  dialRadius * 0.00)` — shift the sub-dial LEFT and keep it on the
-  horizontal midline. Current value of `-0.13, -0.05` looks slightly
-  high-left; adjust to centered-left.
-- **Radius:** `mainTimeRadius = dialRadius * 0.55` — grow slightly from
-  current 0.50. The reference's main time dial is **more than half** the
-  case width.
+- **Center (updated Pass E2 — re-measured against ref photo):**
+  `(caseCenter.x + dialRadius * -0.20, caseCenter.y + dialRadius * -0.05)`
+  — shift LEFT (slightly more than before) and a hair DOWN. In the
+  reference, the main time sits left-of-center and its vertical center is
+  fractionally below the case midline (the date occupies the upper-right
+  quadrant; the main time biases gently toward the lower-left to balance
+  it). Prior `(-0.18, 0.00)` was too high.
+- **Radius (updated Pass E2 — shrunk to match ref proportions):**
+  `mainTimeRadius = dialRadius * 0.48`. Prior 0.55 was too large — the
+  reference clearly shows the main dial occupying roughly the left HALF
+  of the visible dial radius with comfortable margin between the XII
+  marker and the upper bezel lip. 0.48 gives that breathing room while
+  keeping the dial dominant.
 - **Face fill:** `NSColor(srgbRed: 0.965, green: 0.955, blue: 0.925,
   alpha: 1.0)` — a hair lighter than the main dial.
-- **Recess shading (inner edge):**
+- **Recess shading (inner edge) (updated Pass E2 — deeper well shadow):**
   Two ring strokes built as `CAShapeLayer`s stroking the face circle —
   these together sell the recess depth without a gold rim:
   - **Upper-rim shadow (the dark crescent at the top of the well):**
     a CAShapeLayer with `path = ellipseIn(faceRect)`, `lineWidth =
-    max(0.6, mainTimeRadius * 0.020)`, `strokeColor = NSColor(srgbRed:
-    0.55, green: 0.50, blue: 0.40, alpha: 0.65)`. Use `shadowOffset =
-    (0, -mainTimeRadius * 0.010)`, `shadowRadius = mainTimeRadius *
-    0.010`, `shadowOpacity = 0.6`, `shadowColor = .black`. The shadow
-    blooms downward, simulating the lip blocking the light.
+    max(0.8, mainTimeRadius * 0.028)` (thicker), `strokeColor =
+    NSColor(srgbRed: 0.42, green: 0.36, blue: 0.26, alpha: 0.85)`
+    (darker + more opaque). Use `shadowOffset = (0, -mainTimeRadius *
+    0.018)` (deeper), `shadowRadius = mainTimeRadius * 0.018` (broader
+    bloom), `shadowOpacity = 0.80` (raised from 0.6), `shadowColor =
+    .black`. The shadow blooms downward, simulating the lip blocking the
+    light. The reference shows a clearly visible darker arc at the top
+    of every sub-dial well — this needs to read as a real lip, not a
+    subtle gradient.
   - **Lower-rim highlight (bounce light):** a second CAShapeLayer
     stroking the same circle, `lineWidth = max(0.4, mainTimeRadius *
-    0.012)`, `strokeColor = NSColor(white: 1.0, alpha: 0.45)`,
+    0.012)`, `strokeColor = NSColor(white: 1.0, alpha: 0.55)` (raised
+    from 0.45 — the bounce reads as a faint crescent in the ref), with
     `shadowOpacity = 0`. Mask this layer with a half-disc covering only
     the lower 40% of the face so the highlight reads as a faint moon
     along the bottom of the well — NOT a full ring.
@@ -343,14 +386,13 @@ alpha: 1.0)`.
 - `shadowRadius = 2.5`
 - `shadowPath = handPath` (avoids the alpha-channel shadow path).
 
-**Highlight overlay (optional but strongly recommended):**
-add a second `CAShapeLayer` overlaying the hand with the same path, but
-filled with a vertical gradient via `CAGradientLayer` masked to that
-shape:
-- `colors = [NSColor(white: 1.0, alpha: 0.30), NSColor(white: 1.0,
-  alpha: 0.0)]`
-- `startPoint = (0.30, 1.0)`, `endPoint = (0.7, 0.0)`
-This fakes the upper-half polished gleam.
+**Highlight overlay (updated Pass E2 — now mandatory, see Element 19):**
+each hand gets the standardized gold specular highlight gradient defined
+in Element 19, applied as a child layer of the hand's transform layer so
+the highlight rotates with the hand. The old hand-local vertical gradient
+is superseded — use the Element 19 diagonal gradient (`startPoint =
+(0.0, 1.0)`, `endPoint = (1.0, 0.0)`) for consistency across all gold
+elements.
 
 **Z-order:** hour below minute. Both above moonphase aperture frame.
 Both below the center hub.
@@ -481,19 +523,19 @@ of two eyes and a curved mouth, all in a darker bronze.
 **Man-in-the-moon face (in disc-local coords, disc center = origin,
 radius = discR):**
 
-- **Left eye:** filled circle, center = `(-discR * 0.30, +discR * 0.18)`,
-  radius = `discR * 0.07`.
-- **Right eye:** filled circle, center = `(+discR * 0.30, +discR *
-  0.18)`, radius = `discR * 0.07`.
-- **Smile (open arc):** `addArc(center: (0, +discR * 0.30), radius:
-  discR * 0.38, startAngle: -π * 0.85, endAngle: -π * 0.15,
-  clockwise: false)`. This produces a downward-opening crescent below
-  the eyes — a classic smile. **Stroke**, not fill.
-  - `strokeColor = NSColor(srgbRed: 0.55, green: 0.36, blue: 0.16,
-    alpha: 1.0)` — bronze, definitely darker than `moonGold`.
-  - `lineWidth = max(0.6, discR * 0.07)`
+- **Left eye (updated Pass E2 — larger so it reads):** filled circle,
+  center = `(-discR * 0.28, +discR * 0.20)`, radius = `discR * 0.09`
+  (raised from 0.07).
+- **Right eye:** filled circle, center = `(+discR * 0.28, +discR *
+  0.20)`, radius = `discR * 0.09`.
+- **Smile (open arc) (updated Pass E2 — thicker):** `addArc(center:
+  (0, +discR * 0.28), radius: discR * 0.40, startAngle: -π * 0.85,
+  endAngle: -π * 0.15, clockwise: false)`. **Stroke**, not fill.
+  - `strokeColor = NSColor(srgbRed: 0.48, green: 0.28, blue: 0.10,
+    alpha: 1.0)` — deeper bronze so it reads at small scale.
+  - `lineWidth = max(0.8, discR * 0.09)` (thicker than prior 0.07).
   - `lineCap = .round`
-- **Eye fill color:** same bronze as smile stroke.
+- **Eye fill color:** same deeper bronze as smile stroke.
 
 ---
 
@@ -503,11 +545,15 @@ Small four-pointed stars dotting the navy aperture, visible at the
 edges when the moon is at full or near-full phase.
 
 - **Count:** 8 stars (current count is fine).
-- **Star shape:** 4-pointed star with `outerRadius / innerRadius = 2.5`
-  (current uses 2.5 — `outer = hw * 0.05`, `inner = outer * 0.40`).
-  Keep `outer = apertureHalfWidth * 0.05`.
-- **Color:** `starGold = NSColor(srgbRed: 1.00, green: 0.92, blue: 0.62,
-  alpha: 1.0)` — brighter than the moon disc so they pop against navy.
+- **Star shape (updated Pass E2 — larger so they read in the navy):**
+  4-pointed star with `outerRadius / innerRadius = 2.5`. Use
+  `outer = apertureHalfWidth * 0.07` (raised from 0.05). The reference
+  stars are small but distinctly visible four-point cross-stars — they
+  must read as stars, not as dots.
+- **Color (updated Pass E2 — brighter for contrast):** `starGold =
+  NSColor(srgbRed: 1.00, green: 0.95, blue: 0.72, alpha: 1.0)` — a touch
+  brighter than prior so they pop against the deep navy. Update palette
+  to match.
 - **Positions** (normalized: `fx ∈ [-1, +1]` across half-width;
   `fy ∈ [0, 1]` across full aperture height):
 
@@ -544,11 +590,18 @@ Confirmed: **TWO separate gold-framed white boxes** for the Lange 1
 variant. (The Grand Lange 1 in the secondary reference uses one frame;
 we target the regular Lange 1.)
 
-- **Box center (midpoint between the two boxes):**
-  `(caseCenter.x + dialRadius * 0.30, caseCenter.y + dialRadius * 0.42)`
-  — adjust slightly right and slightly lower than current to clear the
-  main time sub-dial's upper-right edge.
-- **Box height:** `boxH = dialRadius * 0.17`.
+- **Box center (updated Pass E2 — re-measured against ref photo):**
+  `(caseCenter.x + dialRadius * 0.20, caseCenter.y + dialRadius * 0.55)`
+  — moved INWARD (x: 0.30 → 0.20) and substantially HIGHER (y: 0.42 →
+  0.55). In the reference, the big date sits in the top quarter of the
+  dial with its top edge tucked close to the inner bezel lip, and its
+  inner (left) edge sits roughly over the XII marker of the main time —
+  i.e. clearly inboard of the case wall on the right, not pushed against
+  the bezel. Prior values placed it too far right and too low (it
+  collided with the main time perimeter).
+- **Box height (updated Pass E2):** `boxH = dialRadius * 0.16`. Slightly
+  smaller than prior 0.17 because the main time radius shrank from 0.55
+  → 0.48 — the date should scale with the main dial it sits beside.
 - **Box width (each):** `boxW = boxH * 0.78`.
 - **Gap between boxes:** `gap = boxH * 0.04`.
 - **Corner radius (interior white boxes):** `boxH * 0.06` — barely
@@ -598,11 +651,16 @@ we target the regular Lange 1.)
 Recessed silver, same treatment recipe as the main time dial, just
 smaller.
 
-- **Center:** `(caseCenter.x + dialRadius * 0.32, caseCenter.y +
-  dialRadius * -0.40)` — slight tweak right + slight tweak up vs
-  current (0.30, -0.45), so the dial doesn't crowd the bottom edge.
-- **Radius:** `subSecondsRadius = dialRadius * 0.22` (grown from
-  current 0.20 — the reference sub-seconds is more prominent).
+- **Center (updated Pass E2 — re-measured against ref photo):**
+  `(caseCenter.x + dialRadius * 0.34, caseCenter.y + dialRadius * -0.38)`
+  — minor tweak: a hair further right and a hair higher than prior. In
+  the reference the sub-seconds sits with its right edge well clear of
+  the bezel and its bottom edge above the MADE IN GERMANY text.
+- **Radius (updated Pass E2 — shrunk to match ref proportions):**
+  `subSecondsRadius = dialRadius * 0.18`. Prior 0.22 was oversized. In
+  the reference, the sub-seconds dial is roughly 38% of the main time
+  dial's radius. With `mainTimeRadius = 0.48 * dialRadius`, that yields
+  `subSecondsRadius ≈ 0.18 * dialRadius`.
 - **Face fill:** `subDialFace` — same color as main time.
 - **Recess shading:** copy the main time treatment (upper-rim shadow +
   lower-rim highlight strokes, recess gradient, polished gloss radial)
@@ -713,28 +771,53 @@ hand sweeps between them.
     toward the pivot).
   - Color: `subDialNumeral`.
   - **No** drop shadow (printed).
-- **Indicator hand:**
-  - This is a **slim lance with a small tail** (it's a hand, not a
-    needle — confirmed in the reference detail shot — but its lozenge
-    is much shorter than the time hands).
-  - Length: `powerReserveRadius * 0.82` (slightly longer than current
-    0.74; the hand in the reference reaches close to the outer ticks).
-  - Width: `powerReserveRadius * 0.14` (slimmer than current 0.18).
-  - Use the same `goldHandPath(taper: true, withHole: false)`
-    constructor as the time hands.
-  - Fill `handGold`, edge stroke as for the time hands.
-  - Drop shadow: `shadowOffset = (0.8, -1.0)`, `shadowOpacity = 0.40`,
-    `shadowRadius = 1.5`.
+- **Indicator hand (updated Pass E2 — short slim needle, not a lance):**
+  In the primary reference the power reserve hand is a **short, slim
+  horizontal needle** — closer to a tapered pin than a watch hand. It is
+  NOT the same silhouette as the hour/minute hands. There is no lozenge,
+  no obvious counterweight, and the hand barely reaches past the inner
+  edge of the major ticks.
+  - Length: `powerReserveRadius * 0.78` — slightly shorter than prior
+    0.82. The tip reaches the inner edge of the major ticks, not the
+    outer edge.
+  - Width (at base): `powerReserveRadius * 0.08` — significantly slimmer
+    than prior 0.14.
+  - Geometry: a simple **tapered triangle** in hand-local coords with
+    `anchorPoint = (0.5, 0.15)` (pivot is at 15% along the length, giving
+    a very short tail stub):
+    1. Move to `(cx, length)` — tip.
+    2. Line to `(cx + width/2 * 0.45, length * 0.20)` — right shoulder
+       just past pivot.
+    3. Line to `(cx + width/2 * 0.25, 0)` — right tail.
+    4. Line to `(cx - width/2 * 0.25, 0)` — left tail.
+    5. Line to `(cx - width/2 * 0.45, length * 0.20)` — left shoulder.
+    6. Close.
+  - This is a **custom path** for the power reserve hand. Do NOT reuse
+    `goldHandPath(taper: true, withHole: false)` — that produces the
+    fancy lozenge profile of the time hands. The power reserve uses its
+    own simple tapered-needle constructor (name it
+    `powerReserveNeedlePath`).
+  - Fill `handGold`. Edge stroke `lineWidth = max(0.25, powerReserveRadius
+    * 0.006)`, `strokeColor = NSColor(srgbRed: 0.42, green: 0.28, blue:
+    0.12, alpha: 1.0)`.
+  - **Tiny pivot dot at the base:** a small `CAShapeLayer` circle at the
+    hand's pivot, `radius = powerReserveRadius * 0.025`, fill `handGold`,
+    stroke `lineWidth = 0.25`, same dark-gold stroke color as above.
+    The reference clearly shows a small gold pivot cap here — overriding
+    the prior "no hub" rule for the power reserve.
+  - Drop shadow: `shadowOffset = (0.6, -0.8)`, `shadowOpacity = 0.35`,
+    `shadowRadius = 1.2`.
 - **Hand rotation logic:** target angle (in standard CCW-from-+x) =
   `abAngle + fraction * (aufAngle - abAngle)`. The hand's intrinsic
   forward direction is +y (angle π/2). Rotation applied =
   `targetAngle - π/2` (counterclockwise positive). Current
   implementation is correct.
-- **No power reserve hub disc** — the reference has the hand pivoting
-  off the right edge with no visible center cap (the pivot lives behind
-  the bezel). Implementation: omit any hub circle here.
+- **Power reserve hub (updated Pass E2 — added):** see the "Tiny pivot
+  dot" note inside the Indicator hand spec above. Prior version said
+  "no hub" — that was wrong; the reference clearly shows a small gold
+  pivot cap.
 - **Z-order:** minor ticks → major ticks → red triangles → labels →
-  indicator hand.
+  indicator hand → hub.
 
 ---
 
@@ -766,51 +849,223 @@ hand sweeps between them.
 
 ---
 
+## Element 18 — Faceplate stipple texture (NEW Pass E2)
+
+The reference photo's silver faceplate is **clearly sandblasted** — a fine
+granular texture covers the entire main dial. Without this, our render
+reads as a flat painted disc. This is the single biggest texture upgrade.
+
+**Implementation strategy: procedurally-generated noise CGImage as a
+low-opacity overlay layer.**
+
+- **Buffer size:** 512×512 pixels. (Larger than 256×256 to avoid visible
+  tiling on Retina screens; small enough to generate in <5ms at attach.)
+- **Generation algorithm** — keep it simple and synchronous, executed
+  once at attach time inside the renderer's `installLayers()`:
+  1. Allocate a `CGContext` of 512×512, 8 bits per channel, sRGB,
+     premultiplied alpha (`CGImageAlphaInfo.premultipliedLast`).
+  2. Fill with **transparent** (alpha = 0).
+  3. For each of `~6000` randomly-positioned points: draw a 1×1 pixel
+     dot with `alpha = 1.0` and a gray value uniformly random in
+     `[0.0, 1.0]`. Use `arc4random_uniform` — does not need to be
+     cryptographically random.
+  4. (Optional, +polish.) Blur the buffer slightly using
+     `CIFilter.gaussianBlur(inputRadius: 0.5)` before extracting the
+     CGImage. This softens the grain so it reads as fine sandblast rather
+     than digital snow. If `CoreImage` is heavy, skip the blur — the raw
+     dots still work.
+  5. Extract the `CGImage` via `context.makeImage()`. Cache on the
+     renderer (`private let faceStippleImage: CGImage`) so canvas
+     resize doesn't regenerate.
+- **Apply as overlay layer:**
+  - New `CALayer` named `dialFaceStippleLayer`.
+  - `contents = faceStippleImage`
+  - `contentsGravity = .resize` (let it stretch — at 512×512 the grain
+    detail survives downscaling to any normal screen).
+  - `opacity = 0.07` — barely visible, just enough to break the flat
+    silver.
+  - `mask` = a `CAShapeLayer` filled with the dial circle so the noise
+    is clipped to the faceplate (does not leak into the bezel).
+  - **Important:** the stipple layer overlays the WHOLE dial face,
+    INCLUDING the area covered by the sub-dials. That's fine because the
+    sub-dial face layers sit ABOVE the stipple in z-order and have
+    opaque fills, so the stipple shows only on the main faceplate
+    region. Do not punch holes in the stipple mask.
+- **Z-order:** dial face fill → faceplate vignette → faceplate stipple →
+  (all sub-dial layers above).
+
+---
+
+## Element 19 — Gold specular highlight gradient (NEW Pass E2)
+
+In the reference photo, every gold element — hands, lozenge markers,
+Roman numerals, hub, date frames, aperture rim, moon disc — has a clearly
+visible **specular highlight band** sweeping diagonally from upper-left to
+lower-right. The base gold tone is the same across the dial, but each
+element catches the studio key light along its upper edge. This is the
+single biggest material upgrade.
+
+**Implementation strategy: for every gold element, add a second
+`CAShapeLayer` overlay with the same path, filled by a masked
+`CAGradientLayer` providing the diagonal highlight band.**
+
+We already specified a hand-only highlight in Element 7 — generalize it
+to ALL gold elements.
+
+- **Gradient layer setup (per element):**
+  - Type: `.axial` (linear).
+  - `startPoint = (0.0, 1.0)` — upper-left in CA y-up.
+  - `endPoint = (1.0, 0.0)` — lower-right.
+  - 4 color stops:
+    - `0.00` → `NSColor(srgbRed: 1.00, green: 0.92, blue: 0.72, alpha:
+      0.55)` — bright cream-gold highlight at the upper-left edge.
+    - `0.30` → `NSColor(srgbRed: 0.96, green: 0.82, blue: 0.52, alpha:
+      0.22)` — soft mid-highlight.
+    - `0.55` → `NSColor(white: 1.0, alpha: 0.0)` — transparent through
+      most of the element.
+    - `1.00` → `NSColor(srgbRed: 0.36, green: 0.22, blue: 0.08, alpha:
+      0.35)` — slight darkening at the lower-right (the shadow side of
+      the element).
+- **Mask:** the gradient layer's `mask` is a `CAShapeLayer` filled with
+  the element's silhouette path. This clips the diagonal gradient to the
+  shape of the element so the highlight only paints where the element is.
+- **Frame:** the gradient layer covers the element's bounding rect.
+- **Z-order per element:** base gold fill → edge stroke → specular
+  highlight overlay → (drop shadow comes from the base fill layer's
+  `shadowPath`).
+- **Apply to:**
+  1. Hour hand
+  2. Minute hand
+  3. Power reserve indicator hand
+  4. Sub-seconds hand
+  5. Each of the 8 hour lozenge markers (apply to the merged
+     `mainTimeHourMarkersLayer` — the mask path can be the merged path
+     of all 8 markers).
+  6. Roman numerals (merged glyph path)
+  7. Center hub (small enough that the gradient won't show much detail,
+     but keep it for consistency)
+  8. Aperture rim frame
+  9. Big date gold frames (both)
+  10. Sub-seconds hub
+  11. Moon disc (use the *disc* circle as the mask path; the face details
+      sit above this layer)
+- **Don't apply to:** stars (they're separate `starGold`, not part of the
+  "applied gold" family), the bezel (already has its own four-stop
+  gradient).
+- **Implementation helper:** add a renderer-private method
+  `applyGoldSpecular(to elementLayer: CAShapeLayer, path: CGPath, bounds:
+  CGRect)` that wires up the gradient + mask + adds it as a sibling
+  immediately above the element. Call it once per gold element at attach
+  time. Highlights do not move with the element if the element rotates
+  (hands rotate; we WANT the highlight to rotate with them — the studio
+  light follows the hand in skeuomorphic terms). So make the highlight
+  layer a CHILD of the element's transform layer, not a sibling at the
+  root. For elements that don't rotate (markers, Romans, date frames,
+  aperture rim, moon disc), siblings are fine.
+
+---
+
+## Element 20 — Sub-dial concentric guilloché (NEW Pass E2)
+
+The reference shows clear **concentric ring patterning** on the sub-seconds
+dial face (visible as faint regular bands inside the silver). The main
+time dial may also have very subtle radial bands; spec it the same way at
+even lower opacity. This sells the "sub-dial is a separate inset plate
+with its own machined finish" feel.
+
+**Implementation strategy: a `CAShapeLayer` containing a path of N
+concentric circles, stroked at very low alpha.**
+
+- **Per sub-dial (main time and sub-seconds), build a guilloché layer:**
+  - `CAShapeLayer` named `<subdial>GuillocheLayer`.
+  - `fillColor = nil`
+  - `strokeColor = NSColor(srgbRed: 0.55, green: 0.50, blue: 0.40, alpha:
+    0.10)` — barely visible warm shadow tone.
+  - `lineWidth = max(0.3, subDialRadius * 0.004)` — hairline.
+- **Ring count + spacing:**
+  - **Sub-seconds:** 7 rings, radii at `subSecondsRadius * [0.18, 0.30,
+    0.42, 0.54, 0.66, 0.78, 0.90]` (roughly `0.12 * subSecondsRadius`
+    apart — visibly machined banding).
+  - **Main time:** 4 rings at `mainTimeRadius * [0.30, 0.50, 0.68, 0.84]`
+    (sparser — main time is mostly smooth in the reference, with just a
+    hint of inner banding under the hands).
+- **Path construction:** for each ring radius `r`, append an
+  `ellipseIn(CGRect(x: -r, y: -r, width: 2r, height: 2r))` to a single
+  `CGMutablePath`. One layer, one path, multiple subpaths.
+- **Z-order within each sub-dial:** face fill → recess gradient → gloss
+  highlight → **guilloché rings** → upper-rim shadow → lower-rim
+  highlight → ticks → numerals → hands → hub.
+  (Guilloché sits ABOVE the gloss so the rings show through; BELOW the
+  rim shadow so the lip is the strongest contrast in the well.)
+- **Sub-seconds-specific extra ring (NEW Pass E2):** the reference clearly
+  shows a slightly heavier *minute-track separator ring* at radius
+  `subSecondsRadius * 0.88` — sitting between the minor tick band and
+  the numeral band. Specify this as part of the sub-seconds guilloché
+  layer at slightly heavier alpha 0.25 and lineWidth `max(0.4,
+  subSecondsRadius * 0.008)`. Easiest: a second `CAShapeLayer`
+  (`subSecondsInnerTrackRing`) so its stroke params can differ.
+
+---
+
 ## Implementation order
 
 When wiring this up, build top-down z-order so each element appears as
-expected:
+expected (updated Pass E2 — added stipple, guilloché, gold specular,
+bezel top-arc highlight, power-reserve hub):
 
 1. Canvas background.
 2. Vignette overlay.
-3. Bezel ring (gradient + outer rim highlight + inner lip).
-4. Dial face (matte silver + vignette).
-5. Main time sub-dial face + recess + gloss + rim strokes.
+3. Bezel ring (gradient + outer rim highlight + **bezel top-arc
+   highlight** + inner lip).
+4. Dial face (matte silver + vignette + **faceplate stipple overlay**).
+5. Main time sub-dial face + recess + gloss + **guilloché rings** + rim
+   strokes.
 6. Main time minute ticks.
-7. Main time hour lozenges (with shadows).
-8. Main time Roman numerals (with shadows).
+7. Main time hour lozenges (with shadows + **gold specular**).
+8. Main time Roman numerals (with shadows + **gold specular**).
 9. Moonphase: sky (clipped) → stars (clipped) → moving disc + face
-   (clipped to stationary aperture mask) → gold rim frame.
-10. Hands: hour → minute (both above the moonphase rim).
-11. Center hub (top of stack at sub-dial level).
-12. Sub-seconds: face → recess → gloss → rim → minor ticks → major
-    ticks → numerals → hand → hub.
-13. Big date: gold frames → white boxes → digits.
+   (clipped to stationary aperture mask, disc with **gold specular**) →
+   gold rim frame (with **gold specular**).
+10. Hands: hour → minute (both above the moonphase rim, each with **gold
+    specular** rotating with the hand).
+11. Center hub (top of stack at sub-dial level, with **gold specular**).
+12. Sub-seconds: face → recess → gloss → **guilloché rings** →
+    **inner-track separator ring** → rim → minor ticks → major ticks →
+    numerals → hand (with **gold specular**) → hub.
+13. Big date: gold frames (with **gold specular**) → white boxes →
+    digits.
 14. Power reserve: minor ticks → major ticks → red triangles → labels →
-    indicator hand.
+    indicator needle (with **gold specular**) → **pivot hub dot**.
 
 ---
 
 ## Palette update summary
 
-The following palette entries should change from their current values:
+The following palette entries should change from their current values
+(updated Pass E2 — added gold specular stops, deeper bronze, brighter
+star, deeper subdial recess, guilloché stroke, brighter case rim):
 
-| Constant                    | New value                                    |
-|-----------------------------|----------------------------------------------|
-| `caseGold`                  | `(0.78, 0.60, 0.32, 1.0)`                    |
-| `caseGoldHighlight`         | `(0.98, 0.88, 0.62, 1.0)`                    |
-| `caseGoldShadow`            | `(0.42, 0.28, 0.12, 1.0)`                    |
-| `caseRim`                   | `(1.00, 0.94, 0.78, 1.0)`                    |
-| `dialFace`                  | `(0.945, 0.935, 0.905, 1.0)`                 |
-| `subDialFace`               | `(0.965, 0.955, 0.925, 1.0)`                 |
-| `subDialShadow`             | `(0.55, 0.50, 0.40, 0.7)`                    |
-| `handGold`                  | `(0.86, 0.68, 0.36, 1.0)`                    |
-| `numeralBlack`              | `(0.12, 0.10, 0.08, 0.92)`                   |
-| `moonSky`                   | `(0.09, 0.14, 0.30, 1.0)`                    |
-| `moonGold`                  | `(0.95, 0.82, 0.50, 1.0)`                    |
-| `moonFaceBronze` (new)      | `(0.55, 0.36, 0.16, 1.0)`                    |
-| `starGold`                  | `(1.00, 0.92, 0.62, 1.0)` (unchanged)        |
-| `dateBackground`            | `(1.00, 0.99, 0.96, 1.0)` (unchanged)        |
-| `dateNumeral`               | `(0.05, 0.04, 0.03, 1.0)` (unchanged)        |
-| `powerReserveRed`           | `(0.80, 0.16, 0.14, 1.0)`                    |
-| `powerReserveTrack`         | `(0.40, 0.34, 0.22, 0.7)` (minor-tick color) |
+| Constant                          | New value                                    |
+|-----------------------------------|----------------------------------------------|
+| `caseGold`                        | `(0.78, 0.60, 0.32, 1.0)`                    |
+| `caseGoldHighlight`               | `(0.98, 0.88, 0.62, 1.0)`                    |
+| `caseGoldShadow`                  | `(0.42, 0.28, 0.12, 1.0)`                    |
+| `caseRim` (Pass E2 — brighter)    | `(1.00, 0.96, 0.82, 1.0)`                    |
+| `caseRimTopArc` (NEW Pass E2)     | `(1.00, 0.98, 0.88, 0.85)`                   |
+| `dialFace`                        | `(0.945, 0.935, 0.905, 1.0)`                 |
+| `subDialFace`                     | `(0.965, 0.955, 0.925, 1.0)`                 |
+| `subDialShadow` (Pass E2 — deeper)| `(0.42, 0.36, 0.26, 0.85)`                   |
+| `subDialGuilloche` (NEW Pass E2)  | `(0.55, 0.50, 0.40, 0.10)`                   |
+| `handGold`                        | `(0.86, 0.68, 0.36, 1.0)`                    |
+| `handGoldSpecularHi` (NEW Pass E2)| `(1.00, 0.92, 0.72, 0.55)`                   |
+| `handGoldSpecularMid` (NEW)       | `(0.96, 0.82, 0.52, 0.22)`                   |
+| `handGoldSpecularLo` (NEW)        | `(0.36, 0.22, 0.08, 0.35)`                   |
+| `numeralBlack`                    | `(0.12, 0.10, 0.08, 0.92)`                   |
+| `moonSky`                         | `(0.09, 0.14, 0.30, 1.0)`                    |
+| `moonGold`                        | `(0.95, 0.82, 0.50, 1.0)`                    |
+| `moonFaceBronze` (Pass E2 deeper) | `(0.48, 0.28, 0.10, 1.0)`                    |
+| `starGold` (Pass E2 — brighter)   | `(1.00, 0.95, 0.72, 1.0)`                    |
+| `dateBackground`                  | `(1.00, 0.99, 0.96, 1.0)` (unchanged)        |
+| `dateNumeral`                     | `(0.05, 0.04, 0.03, 1.0)` (unchanged)        |
+| `powerReserveRed`                 | `(0.80, 0.16, 0.14, 1.0)`                    |
+| `powerReserveTrack`               | `(0.40, 0.34, 0.22, 0.7)` (minor-tick color) |
