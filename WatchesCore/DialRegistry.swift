@@ -16,7 +16,7 @@ public enum DialRegistry {
         ProofOfHostRenderer.self,
         RoyaleRenderer.self,
         AsymmetricMoonphaseRenderer.self,
-        // Story 2.1: + CokeGMTRenderer.self
+        CokeGMTRenderer.self,
         // Story 2.2: + OctagonRenderer.self
         // Story 2.3: + MoonchronoRenderer.self
         // Story 2.4: + DiverRenderer.self
