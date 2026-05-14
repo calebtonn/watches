@@ -164,11 +164,51 @@ stress cases:** digital paradigm + paradigm-mixing-within-a-dial +
 non-concentric-layout-across-readouts. Epic 2's remaining four dials
 (Coke GMT, Octagon, Moonchrono, Diver) are execution rather than architecture.
 
+## Polish pass (Story 1.6, post-first-pass — 2026-05-13)
+
+Addressed Caleb's 7-point critique on the first-pass snapshot:
+
+1. **Hands → elongated arrowhead / lance.** `goldHandPath(taper:)` reshaped
+   with a wide rounded tail, slim shaft, spear-blade shoulder near the tip,
+   sharp point — matches Lange 1 silhouette. Non-tapered variant kept as a
+   slimmer leaf shape for the sub-seconds hand.
+2. **Big date → gold frames + drop shadow.** `bigDateGoldFrame1/2` layers
+   insert a gold rounded-rect behind each white box. Numerals get
+   `CALayer.shadow*` with `shadowPath` updated each tick. Font switched to
+   Didot-Bold (fallback chain: Bodoni 72 Bold → Times New Roman Bold).
+3. **Aperture shape → semicircle top + two rolling-hill bites.**
+   `buildAperturePath(in:)` constructs the silhouette: top semicircular arc +
+   two quadratic Beziers as upward "hills" cutting into the baseline. Bezier
+   gives independent control of hill width vs height (semicircles couldn't —
+   they made the aperture read as "heart-shaped").
+4. **Moonphase rendering → actual lunar phase via two-disc occulter.**
+   `moonphaseOcculterLayer` (navy disc) translates over the stationary moon
+   based on `AsymmetricMoonphaseMath.moonPhaseFraction(for:)`. Piecewise
+   formula in `updateMoonphaseTransform`: waxing (`f ≤ 0.5`) shifts occulter
+   left, waning (`f > 0.5`) shifts right. Result: waxing crescent shows
+   bright on right, full at f≈0.5, waning crescent shows bright on left
+   (northern-hemisphere convention).
+5. **Power reserve → tick marks, no arc.** `powerReserveArcLayer.path` now
+   contains 13 stroked lines along the arc radius (major ticks at AUF /
+   midpoint / AB), drawn in `numeralBlack` with rounded caps.
+6. **Sub-dial frames → recessed shadow rings.** `mainTimeOuterRing` and
+   `subSecondsFaceLayer.strokeColor` no longer gold (was `handGold`, now
+   `subDialShadow`). Added `mainTimeRecessShade` / `subSecondsRecessShade`
+   `CAGradientLayer`s with vertical dark-top → light-bottom gradient masked
+   to the face circle — sells the inset/recessed effect.
+7. **Sizes + positions retuned.** Main time radius `0.42 → 0.48 · dialRadius`,
+   center pulled slightly further left + down. Big date / sub-seconds slid
+   right to clear the bigger main time. Power reserve radius `0.26 → 0.18`,
+   center pulled inward. Aperture width `0.34 → 0.40 · mainTimeRadius`.
+
 ## Open follow-ups
 
-- Hand styling — current pentagonal-tapered hands are recognizable but not
-  as elegant as the real Lange's "lance" hands. Future polish.
-- Big date boxes — could have more pronounced frames matching the real watch.
-- Moonphase aperture shape — currently an ellipse; the real watch uses a
-  slightly arched shape with a downward curve at the bottom.
-- Sub-seconds dial ring — could have a thin gold border matching the main time dial.
+- Phase rendering when moon is partly behind the hills: the visible phase
+  shape can be partially clipped by the hill silhouette. Acceptable for
+  Lange-1 "moon over hills" aesthetic, but if Caleb wants stricter phase
+  fidelity we'd need to raise the moon higher OR shorten the hills further.
+- Power reserve indicator hand vs. tick density — currently 12 ticks. If
+  Caleb wants a less-crowded look we could drop to 8 ticks (AUF, AB,
+  midpoint + 5 intermediate).
+- Sub-seconds dial could benefit from a thin engraved boundary line outside
+  the recess gradient for additional skeuomorphic depth.
