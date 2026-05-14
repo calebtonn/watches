@@ -880,8 +880,12 @@ public final class CokeGMTRenderer: DialRenderer {
 
         dateBoxFont = sansBoldFont(size: dateBoxH * 0.75)
         dateDigitLayer.frame = CGRect(origin: .zero, size: canvas)
-        // Initial digit — overwritten on first tick.
-        updateDateDigit(day: 0)
+        // Re-render today's digit against the new layout. Skipping this
+        // leaves the digit's path positioned for the *previous* canvas
+        // size — and a later tick won't redraw because `lastRenderedDay`
+        // already equals today. Symptom: date freezes on "1" (the
+        // clamped placeholder) after a canvas resize until midnight.
+        updateDateDigit(day: lastRenderedDay ?? localCalendar.component(.day, from: Date()))
 
         // Hands. Pass-3: hour hand is now a clean 4-vertex diamond
         // (no chamfering — matches the GMT hand's geometric simplicity);
