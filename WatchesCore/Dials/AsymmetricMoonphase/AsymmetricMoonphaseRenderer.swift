@@ -345,6 +345,12 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
 
         mainTimeHourMarkersLayer.fillColor = AsymmetricMoonphasePalette.handGold
         mainTimeHourMarkersLayer.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        // Drop shadow gives the markers a raised/applied 3D feel matching
+        // the reference detail shot's "polished gold stud" appearance.
+        mainTimeHourMarkersLayer.shadowColor = NSColor.black.cgColor
+        mainTimeHourMarkersLayer.shadowOpacity = 0.35
+        mainTimeHourMarkersLayer.shadowOffset = CGSize(width: 0.5, height: -0.5)
+        mainTimeHourMarkersLayer.shadowRadius = 0.8
         caseBackgroundLayer.addSublayer(mainTimeHourMarkersLayer)
 
         // Moonphase — z-order: sky → stars → disc → clip-mask (applied as
@@ -380,6 +386,7 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         // Hands — anchor at bottom-center, rotation pivots at sub-dial center.
         mainTimeHourHand.fillColor = AsymmetricMoonphasePalette.handGold
         mainTimeHourHand.strokeColor = nil
+        mainTimeHourHand.fillRule = .evenOdd       // for the blade lozenge hole
         mainTimeHourHand.anchorPoint = CGPoint(x: 0.5, y: 0.0)
         mainTimeHourHand.actions = ["transform": NSNull(), "position": NSNull()]
         caseBackgroundLayer.addSublayer(mainTimeHourHand)
@@ -491,6 +498,7 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
 
         powerReserveIndicatorHand.fillColor = AsymmetricMoonphasePalette.handGold
         powerReserveIndicatorHand.strokeColor = nil
+        powerReserveIndicatorHand.fillRule = .evenOdd       // blade lozenge hole
         powerReserveIndicatorHand.anchorPoint = CGPoint(x: 0.5, y: 0.0)
         powerReserveIndicatorHand.actions = ["transform": NSNull(), "position": NSNull()]
         caseBackgroundLayer.addSublayer(powerReserveIndicatorHand)
@@ -695,6 +703,7 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         }
         mainTimeHourMarkersLayer.frame = CGRect(origin: .zero, size: canvas)
         mainTimeHourMarkersLayer.path = markersPath
+        mainTimeHourMarkersLayer.shadowPath = markersPath
         mainTimeHourMarkersLayer.lineWidth = max(0.3, r * 0.004)
 
         // Roman numerals at 12 / 3 / 6 / 9 — drawn via Core Text glyph paths
@@ -1227,12 +1236,15 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         powerReserveABAngle = abAngle
         powerReservePivot = CGPoint(x: cx, y: cy)
 
-        // Tick marks along the arc path. Fewer ticks (8 segments → 9 lines)
-        // for a less-crowded reading; majors at AUF / midpoint / AB.
-        let ticksPath = CGMutablePath()
+        // Tick marks along the arc path. Reference detail shot shows ONLY
+        // the major ticks prominently — AUF, midpoint, AB. Minor ticks are
+        // present but very faint. We split into two layers (major dark,
+        // minor light/thin) but here render minors only in this layer.
+        let minorTicksPath = CGMutablePath()
+        let majorTicksPath = CGMutablePath()
         let tickCount = 8
         let tickOuter = r
-        let minorInner = r * 0.91
+        let minorInner = r * 0.93
         let majorInner = r * 0.83
         for i in 0...tickCount {
             let t = CGFloat(i) / CGFloat(tickCount)
@@ -1240,14 +1252,30 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
             let isMajor = (i == 0) || (i == tickCount / 2) || (i == tickCount)
             let innerR = isMajor ? majorInner : minorInner
             let dx = cos(angle), dy = sin(angle)
-            ticksPath.move(to: CGPoint(x: cx + dx * innerR, y: cy + dy * innerR))
-            ticksPath.addLine(to: CGPoint(x: cx + dx * tickOuter, y: cy + dy * tickOuter))
+            let p1 = CGPoint(x: cx + dx * innerR, y: cy + dy * innerR)
+            let p2 = CGPoint(x: cx + dx * tickOuter, y: cy + dy * tickOuter)
+            if isMajor {
+                majorTicksPath.move(to: p1)
+                majorTicksPath.addLine(to: p2)
+            } else {
+                minorTicksPath.move(to: p1)
+                minorTicksPath.addLine(to: p2)
+            }
         }
+        // Combine into one path; visual hierarchy comes from lighter color +
+        // thinner line for minors via the layer's stroke settings (one color
+        // applies). We approximate the "AUF/midpoint/AB dominant" look by
+        // shortening minors and keeping a single uniform stroke that reads
+        // as subtle uniform graduation — matching the reference where the
+        // intermediate ticks are barely visible.
+        let combinedPath = CGMutablePath()
+        combinedPath.addPath(minorTicksPath)
+        combinedPath.addPath(majorTicksPath)
         powerReserveArcLayer.frame = CGRect(origin: .zero, size: canvas)
-        powerReserveArcLayer.path = ticksPath
-        powerReserveArcLayer.lineWidth = max(0.5, r * 0.05)
+        powerReserveArcLayer.path = combinedPath
+        powerReserveArcLayer.lineWidth = max(0.5, r * 0.030)
         powerReserveArcLayer.lineCap = .round
-        powerReserveArcLayer.strokeColor = AsymmetricMoonphasePalette.numeralBlack
+        powerReserveArcLayer.strokeColor = AsymmetricMoonphasePalette.subDialNumeral
 
         // Red triangles at AUF + AB ends
         let triR = r * 0.10
@@ -1379,10 +1407,13 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
 
     /// Lange-1 lance hand path. `width` is the diamond's peak width, `length`
     /// is forward-from-pivot reach. The path also includes a counterweight
-    /// tail of `tailFraction × length` extending behind the pivot, and
+    /// tail of `tailFraction × length` extending behind the pivot, a HOLLOW
+    /// lozenge near the tip (Lange's iconic open-blade signature), and
     /// optionally a circular hole/ring near the pivot (minute-hand signature).
     /// Anchor is at the PIVOT (not the bottom of the path). Callers must set
-    /// `layer.anchorPoint.y = tailFraction / (1 + tailFraction)`.
+    /// `layer.anchorPoint.y = tailFraction / (1 + tailFraction)` AND
+    /// `fillRule = .evenOdd` on the host layer so the inner subpaths render
+    /// as holes.
     private func goldHandPath(
         width: CGFloat,
         length: CGFloat,
@@ -1393,7 +1424,6 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         let cx = width / 2
         if taper {
             let tailL = length * Self.handTailFraction
-            let totalL = length + tailL
             let shaftW = width * 0.16            // slim shaft
             let tailW = width * 0.52             // small lozenge at the tail end
             let diamondW = width                 // peak blade width = input width
@@ -1402,7 +1432,7 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
             let tipNarrowY = tailL + length * 0.92
             let tipY = tailL + length
 
-            // Tail tip at the bottom of the path
+            // Tail tip at the bottom of the path (outer blade silhouette).
             path.move(to: CGPoint(x: cx, y: 0))
             path.addLine(to: CGPoint(x: cx + tailW / 2, y: tailL * 0.55))
             path.addLine(to: CGPoint(x: cx + shaftW / 2, y: tailL))
@@ -1415,12 +1445,24 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
             path.addLine(to: CGPoint(x: cx - shaftW / 2, y: diamondStartY))
             path.addLine(to: CGPoint(x: cx - shaftW / 2, y: tailL))
             path.addLine(to: CGPoint(x: cx - tailW / 2, y: tailL * 0.55))
-            _ = totalL
+            path.closeSubpath()
+
+            // Hollow lozenge near the tip — Lange's iconic "open" blade.
+            // Inset relative to the outer diamond so a gold frame remains
+            // around the hole.
+            let bladeCenterY = (diamondStartY + tipNarrowY) / 2
+            let innerHalfHeight = (tipNarrowY - diamondStartY) * 0.40
+            let innerHalfWidth = diamondW * 0.30
+            path.move(to: CGPoint(x: cx, y: bladeCenterY + innerHalfHeight))
+            path.addLine(to: CGPoint(x: cx + innerHalfWidth, y: bladeCenterY))
+            path.addLine(to: CGPoint(x: cx, y: bladeCenterY - innerHalfHeight))
+            path.addLine(to: CGPoint(x: cx - innerHalfWidth, y: bladeCenterY))
             path.closeSubpath()
 
             if withHole {
-                // Hole/ring near pivot — Lange 1 minute-hand signature. With
-                // .evenOdd fill rule, this circle is subtracted from the body.
+                // Circular eye near the pivot — minute-hand signature. A
+                // separate (non-nested) subpath, so with .evenOdd it also
+                // renders as a hole alongside the blade lozenge.
                 let holeR = shaftW * 1.6
                 let holeY = tailL + holeR * 1.4
                 path.addEllipse(in: CGRect(
