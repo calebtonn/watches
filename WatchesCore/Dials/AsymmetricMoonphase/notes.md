@@ -238,6 +238,21 @@ landed a second round of changes:
    sits clearly in the dial face rather than against the bezel. Tick count
    dropped 12 → 8 for a less-crowded reading; majors at AUF / midpoint / AB.
 
+## Polish pass B — gloss / matte (2026-05-13)
+
+Per Caleb: the Lange 1's sub-dials are GLOSSY (polished silver), while the
+surrounding faceplate is MATTE.
+
+Implementation: added `mainTimeGlossLayer` + `subSecondsGlossLayer` as
+`CAGradientLayer`s with `.radial` type. Each is a radial highlight at the
+upper-LEFT of the sub-dial face (startPoint 0.30, 0.78), fading outward to
+transparent. Masked to the sub-dial's face circle and layered ABOVE the
+recess shade (which was simultaneously reduced in intensity so the gloss
+reads clearly without fighting the recess gradient).
+
+The faceplate stays as a flat silver fill — by contrast it now reads as
+matte. No additional faceplate texture needed.
+
 ## Open follow-ups
 
 - Stars are very small and easy to miss at typical screensaver size. May
@@ -246,4 +261,5 @@ landed a second round of changes:
 - At certain moon phases (e.g., near new moon), only a thin sliver of moon
   shows. Visually correct but may want a tiny opacity bump on the navy sky
   decoration so the aperture doesn't feel empty.
-- Faceplate grain texture (subtle stippling) not yet implemented.
+- If we want even more "polished" feel, could add a second smaller, brighter
+  highlight on top of the main gloss (specular hot-spot).

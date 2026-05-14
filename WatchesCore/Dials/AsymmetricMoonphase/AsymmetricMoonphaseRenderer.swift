@@ -66,6 +66,7 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
 
     private let mainTimeFaceLayer = CAShapeLayer()
     private let mainTimeRecessShade = CAGradientLayer()
+    private let mainTimeGlossLayer = CAGradientLayer()    // polished-silver highlight
     private let mainTimeOuterRing = CAShapeLayer()
     private let mainTimeNumeralsLayer = CAShapeLayer()
     private let mainTimeTicksLayer = CAShapeLayer()
@@ -108,6 +109,7 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
 
     private let subSecondsFaceLayer = CAShapeLayer()
     private let subSecondsRecessShade = CAGradientLayer()
+    private let subSecondsGlossLayer = CAGradientLayer()    // polished-silver highlight
     private let subSecondsNumeralsLayer = CAShapeLayer()
     private let subSecondsTicksLayer = CAShapeLayer()
     private let subSecondsHand = CAShapeLayer()
@@ -302,16 +304,30 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
 
         // Recess shade — subtle dark-at-top / light-at-bottom overlay clipped
         // to the sub-dial face. Sells the "this dial is sunken into the plate"
-        // skeuomorphic effect without any gold rim.
+        // skeuomorphic effect without any gold rim. Intensity reduced so the
+        // gloss highlight (added next) can read clearly.
         mainTimeRecessShade.startPoint = CGPoint(x: 0.5, y: 1.0)
         mainTimeRecessShade.endPoint = CGPoint(x: 0.5, y: 0.0)
         mainTimeRecessShade.colors = [
-            NSColor(white: 0.0, alpha: 0.32).cgColor,
-            NSColor(white: 0.0, alpha: 0.06).cgColor,
-            NSColor(white: 1.0, alpha: 0.18).cgColor,
+            NSColor(white: 0.0, alpha: 0.20).cgColor,
+            NSColor(white: 0.0, alpha: 0.02).cgColor,
+            NSColor(white: 1.0, alpha: 0.10).cgColor,
         ]
         mainTimeRecessShade.locations = [0.0, 0.55, 1.0]
         caseBackgroundLayer.addSublayer(mainTimeRecessShade)
+
+        // Gloss highlight — radial bright spot at upper-left, fading outward.
+        // Sells "polished silver" finish (matte faceplate vs. glossy sub-dials).
+        mainTimeGlossLayer.type = .radial
+        mainTimeGlossLayer.startPoint = CGPoint(x: 0.30, y: 0.78)
+        mainTimeGlossLayer.endPoint = CGPoint(x: 1.00, y: 0.20)
+        mainTimeGlossLayer.colors = [
+            NSColor(white: 1.0, alpha: 0.45).cgColor,
+            NSColor(white: 1.0, alpha: 0.12).cgColor,
+            NSColor(white: 1.0, alpha: 0.00).cgColor,
+        ]
+        mainTimeGlossLayer.locations = [0.0, 0.45, 1.0]
+        caseBackgroundLayer.addSublayer(mainTimeGlossLayer)
 
         // Inner-boundary shadow ring (replaces gold ring) — dark thin stroke
         // just inside the face perimeter to define the recessed edge.
@@ -425,12 +441,23 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         subSecondsRecessShade.startPoint = CGPoint(x: 0.5, y: 1.0)
         subSecondsRecessShade.endPoint = CGPoint(x: 0.5, y: 0.0)
         subSecondsRecessShade.colors = [
-            NSColor(white: 0.0, alpha: 0.32).cgColor,
-            NSColor(white: 0.0, alpha: 0.06).cgColor,
-            NSColor(white: 1.0, alpha: 0.18).cgColor,
+            NSColor(white: 0.0, alpha: 0.20).cgColor,
+            NSColor(white: 0.0, alpha: 0.02).cgColor,
+            NSColor(white: 1.0, alpha: 0.10).cgColor,
         ]
         subSecondsRecessShade.locations = [0.0, 0.55, 1.0]
         caseBackgroundLayer.addSublayer(subSecondsRecessShade)
+
+        subSecondsGlossLayer.type = .radial
+        subSecondsGlossLayer.startPoint = CGPoint(x: 0.30, y: 0.78)
+        subSecondsGlossLayer.endPoint = CGPoint(x: 1.00, y: 0.20)
+        subSecondsGlossLayer.colors = [
+            NSColor(white: 1.0, alpha: 0.45).cgColor,
+            NSColor(white: 1.0, alpha: 0.12).cgColor,
+            NSColor(white: 1.0, alpha: 0.00).cgColor,
+        ]
+        subSecondsGlossLayer.locations = [0.0, 0.45, 1.0]
+        caseBackgroundLayer.addSublayer(subSecondsGlossLayer)
 
         subSecondsTicksLayer.fillColor = nil
         subSecondsTicksLayer.strokeColor = AsymmetricMoonphasePalette.subDialNumeral
@@ -594,16 +621,24 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         mainTimeFaceLayer.frame = CGRect(origin: .zero, size: canvas)
         mainTimeFaceLayer.path = CGPath(ellipseIn: faceRect, transform: nil)
 
-        // Recess gradient — masked to the face circle, applied in the
-        // sub-dial's local coordinate space so the gradient spans only the
-        // face (not the whole canvas).
-        mainTimeRecessShade.frame = faceRect
-        let recessMask = CAShapeLayer()
-        recessMask.path = CGPath(
+        // Recess gradient + gloss highlight — both masked to the face circle,
+        // applied in the sub-dial's local coordinate space so they span only
+        // the face (not the whole canvas).
+        let faceCirclePath = CGPath(
             ellipseIn: CGRect(origin: .zero, size: faceRect.size), transform: nil
         )
+
+        mainTimeRecessShade.frame = faceRect
+        let recessMask = CAShapeLayer()
+        recessMask.path = faceCirclePath
         recessMask.fillColor = NSColor.white.cgColor
         mainTimeRecessShade.mask = recessMask
+
+        mainTimeGlossLayer.frame = faceRect
+        let glossMask = CAShapeLayer()
+        glossMask.path = faceCirclePath
+        glossMask.fillColor = NSColor.white.cgColor
+        mainTimeGlossLayer.mask = glossMask
 
         // Inner-boundary shadow stroke (replaces the old gold ring).
         mainTimeOuterRing.frame = CGRect(origin: .zero, size: canvas)
@@ -1080,13 +1115,21 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         subSecondsFaceLayer.path = CGPath(ellipseIn: faceRect, transform: nil)
         subSecondsFaceLayer.lineWidth = max(0.5, r * 0.020)
 
-        subSecondsRecessShade.frame = faceRect
-        let recessMask = CAShapeLayer()
-        recessMask.path = CGPath(
+        let subFaceCirclePath = CGPath(
             ellipseIn: CGRect(origin: .zero, size: faceRect.size), transform: nil
         )
+
+        subSecondsRecessShade.frame = faceRect
+        let recessMask = CAShapeLayer()
+        recessMask.path = subFaceCirclePath
         recessMask.fillColor = NSColor.white.cgColor
         subSecondsRecessShade.mask = recessMask
+
+        subSecondsGlossLayer.frame = faceRect
+        let glossMask = CAShapeLayer()
+        glossMask.path = subFaceCirclePath
+        glossMask.fillColor = NSColor.white.cgColor
+        subSecondsGlossLayer.mask = glossMask
 
         // Tick marks
         let ticksPath = CGMutablePath()
