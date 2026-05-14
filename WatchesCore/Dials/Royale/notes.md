@@ -55,13 +55,25 @@ Inspired by the Casio AE-1200WH.
 
 **Deferred.** Locale-dependent date-format ordering. Tracked in `deferred-work.md`.
 
-### D7: World-time map — placeholder this story, bitmap in Story 1.5.1
+### D7: World-time map — bitmap asset (Story 1.5.1 landed)
 
-**Decision.** Story 1.5 ships a placeholder for the world-map region (outline rectangle or low-fidelity shape). The real dot-matrix continent bitmap lands in Story 1.5.1 (created post-1.5, before Epic 2).
+**Decision.** Story 1.5 shipped a procedural 36×14 dot-pattern via `RoyaleRenderer.continentsPath(size:)` as a placeholder. Story 1.5.1 replaced this with a real PNG bitmap (`RoyaleMap.png`) bundled inside `WatchesCore.framework`, rendered via `mapLayer.contents = CGImage`. The procedural code was deleted.
 
-**Why.** Story 1.5's purpose is the protocol stress test, not pixel-perfect AE-1200WH. A real map asset adds bundle-resource management (framework-bundle path lookup) that's orthogonal to the protocol question and worth its own story.
+**Why.** Two reasons: (a) the bitmap can be hand-tuned for higher fidelity than source-code-bound dot grids without recompilation, and (b) Story 1.5.1 established the bundle-resource-loading pattern (`Bundle(for: RoyaleRenderer.self)`) that future dials with bitmap assets will reuse.
 
-**Deferred.** World-map bitmap asset (Story 1.5.1). Day/night terminator math (TBD).
+**Implementation.** The PNG is 432×168 with circular dots (6×6 pixel cells, ~5px dot diameter). Authored programmatically via `Tools/DialSnapshot/main.swift --generate-royale-map`. The renderer uses `mapLayer.contentsGravity = .resize` + `magnificationFilter = .linear` to smoothly scale the dots up to the display cutout size.
+
+**Deferred.** Day/night terminator math (TBD).
+
+### D9: Bundle-resource lookup pattern (Story 1.5.1)
+
+**Decision.** Per-dial binary assets (PNG bitmaps, future texture maps, etc.) live in `WatchesCore/Dials/<DialName>/` alongside the dial's Swift sources, are bundled into `WatchesCore.framework` automatically via `project.yml`'s sources glob (no explicit `resources:` block needed; the existing `excludes: ["**/*.md"]` keeps notes out of the bundle without affecting PNGs), and are loaded at runtime via `Bundle(for: <DialRenderer>.self).url(forResource:withExtension:)`.
+
+**Why `Bundle(for:)` not `Bundle.main`.** The screensaver host process is `legacyScreenSaver.appex`. `Bundle.main` resolves to *that* process's bundle, not WatchesCore.framework. Using `Bundle(for: <DialRenderer>.self)` walks back from a class defined inside WatchesCore to the framework's bundle, which is the correct resource container.
+
+**Error posture.** Resource-load failures (`url(forResource:...) == nil` or `CGImageSourceCreateImageAtIndex` returning nil) MUST NOT crash. Per P10, the renderer falls back gracefully (e.g., empty content for that region) and logs at `error` level. Pattern is established in `RoyaleRenderer.loadMapImage()` for other dials to follow.
+
+**Reference implementation.** `RoyaleRenderer.loadMapImage()` is the canonical example. Story 1.6+ dials needing bitmap assets should copy that shape.
 
 ### D8: Functional analog mini-clock inside the subdial cutout (Story 1.5.2)
 

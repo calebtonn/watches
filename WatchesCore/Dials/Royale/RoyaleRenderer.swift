@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import QuartzCore
 
 /// Royale — digital LCD dial homage of the Casio AE-1200WH.
@@ -110,7 +111,6 @@ public final class RoyaleRenderer: DialRenderer {
     private var lastRenderedSecondTickIndex: Int?
 
     private let mapLayer = CALayer()                // sits on LCD, visible through middle-right cutout
-    private let mapContinentsLayer = CAShapeLayer()
     private let timeContainer = CALayer()           // sits on LCD, visible through bottom cutout
     private let secondaryContainer = CALayer()      // sits on LCD, visible through bottom cutout
 
@@ -444,15 +444,21 @@ public final class RoyaleRenderer: DialRenderer {
         subdialSecondTick.actions = ["transform": NSNull(), "position": NSNull()]
         lcdLayer.addSublayer(subdialSecondTick)
 
-        // World map (rendered through the middle-right cutout).
+        // World map (rendered through the middle-right cutout). Story 1.5.1:
+        // the continents are now a real PNG bitmap (`RoyaleMap.png`) bundled
+        // with WatchesCore, not a procedural CAShapeLayer path. PNG is
+        // authored at 432×168 with circular dots; `.linear` filter smooths
+        // the dots when scaled to display size.
         mapLayer.name = "royale.map"
         mapLayer.backgroundColor = nil  // LCD background shows through
+        mapLayer.contentsGravity = .resize
+        mapLayer.magnificationFilter = .linear
+        if let mapImage = Self.loadMapImage() {
+            mapLayer.contents = mapImage
+        } else {
+            Logging.renderer.error("Royale map asset failed to load; map area will render empty")
+        }
         lcdLayer.addSublayer(mapLayer)
-
-        mapContinentsLayer.name = "royale.map.continents"
-        mapContinentsLayer.fillColor = RoyalePalette.mapDot
-        mapContinentsLayer.strokeColor = nil
-        mapLayer.addSublayer(mapContinentsLayer)
 
         // Time + secondary containers (rendered through the bottom cutout).
         timeContainer.name = "royale.time"
@@ -885,11 +891,9 @@ public final class RoyaleRenderer: DialRenderer {
         // Reset rotation cache so the next tick re-renders the seconds tick.
         lastRenderedSecondTickIndex = nil
 
-        // Map — fills the middle-right cutout area.
-        let mapFrameLCD = toLCD(cutouts.middleRight)
-        mapLayer.frame = mapFrameLCD
-        mapContinentsLayer.frame = CGRect(origin: .zero, size: mapFrameLCD.size)
-        mapContinentsLayer.path = Self.continentsPath(size: mapFrameLCD.size)
+        // Map — fills the middle-right cutout area. Bitmap was assigned to
+        // `mapLayer.contents` in installLayers; this just positions the frame.
+        mapLayer.frame = toLCD(cutouts.middleRight)
 
         // Bottom cutout vertical bands (LCD-local y-up, fractions of cutout height):
         //   0.00 – 0.04   bottom margin
@@ -1205,54 +1209,25 @@ public final class RoyaleRenderer: DialRenderer {
         }
     }
 
-    /// Dot-matrix world map matching the AE-1200WH's visual style. A coarse
-    /// grid where each '#' cell becomes a small filled dot. Atlantic-centered
-    /// projection: Americas on the left, Eurasia/Africa center, Pacific
-    /// edges wrap. Rough shapes only — true cartographic accuracy is
-    /// deferred to Story 1.5.1's real bitmap asset.
-    private static func continentsPath(size: CGSize) -> CGPath {
-        // 36 cols × 14 rows; '#' = land, '.' = water. Row 0 is north.
-        // Atlantic-centered: Americas left, Eurasia/Africa center, Indonesia
-        // + Australia right. Recognizable silhouettes only — true cartography
-        // is the bitmap asset in Story 1.5.1.
-        let map: [String] = [
-            "....................................",
-            "........##...............##.........",
-            "....########......##############....",
-            "..##########....################....",
-            "..#########.....################....",
-            "...########......##############.....",
-            "....#######.......############......",
-            ".....######........###########..##..",
-            "......#####.........##########..###.",
-            ".......####..........#########..###.",
-            ".......###...........#######....##..",
-            "........##...........######.........",
-            ".........#............####..........",
-            "....................................",
-        ]
-        let rows = map.count
-        let cols = map.first?.count ?? 0
-        let cellW = size.width / CGFloat(cols)
-        let cellH = size.height / CGFloat(rows)
-        let dotR = min(cellW, cellH) * 0.42
-
-        let path = CGMutablePath()
-        for (rowIdx, rowStr) in map.enumerated() {
-            // Row 0 is north (top) in the array. In y-up CALayer coords,
-            // the top has the highest y, so flip the row index.
-            let yIdx = rows - 1 - rowIdx
-            for (colIdx, char) in rowStr.enumerated() {
-                guard char == "#" else { continue }
-                let x = (CGFloat(colIdx) + 0.5) * cellW
-                let y = (CGFloat(yIdx) + 0.5) * cellH
-                path.addEllipse(in: CGRect(
-                    x: x - dotR, y: y - dotR,
-                    width: dotR * 2, height: dotR * 2
-                ))
-            }
+    /// Loads `RoyaleMap.png` from the WatchesCore framework bundle. Returns
+    /// `nil` on any failure (file missing, decode error, framework bundle
+    /// path resolution failure) — per P10 the renderer never crashes on a
+    /// missing resource. Caller logs and falls back to an empty map.
+    ///
+    /// `Bundle(for: RoyaleRenderer.self)` resolves to WatchesCore.framework,
+    /// NOT `Bundle.main` (which is the screensaver host process —
+    /// legacyScreenSaver.appex). This is the bundle-resource pattern that
+    /// future dials with PNG/binary assets should follow.
+    private static func loadMapImage() -> CGImage? {
+        let bundle = Bundle(for: RoyaleRenderer.self)
+        guard let url = bundle.url(forResource: "RoyaleMap", withExtension: "png") else {
+            return nil
         }
-        return path
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            return nil
+        }
+        return image
     }
 
     /// Just the phillips cross-slot of the screw (two perpendicular line
