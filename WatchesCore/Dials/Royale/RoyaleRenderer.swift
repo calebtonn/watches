@@ -1359,19 +1359,62 @@ public final class RoyaleRenderer: DialRenderer {
             .uppercased()
     }
 
-    /// Returns `CITY, STATE COUNTRY` for the current time zone, derived from
-    /// either the curated lookup table or the IANA identifier + Locale region
-    /// name. Uppercased and diacritic-stripped.
-    private static func currentTimeZoneCity() -> String {
-        let tz = TimeZone.current
-        let identifier = tz.identifier
+    /// Returns the user's selected closest city from macOS Date & Time
+    /// preferences. macOS stores this in `.GlobalPreferences` under the key
+    /// `com.apple.TimeZonePref.Last_Selected_City`, as a CFArray shaped:
+    ///
+    ///   [0] latitude (String), [1] longitude (String), [2] unknown,
+    ///   [3] IANA timezone identifier, [4] country code,
+    ///   [5] city (English), [6] country (English),
+    ///   [7] city (localized), [8] country (localized),
+    ///   [9] "DEPRECATED IN 10.6" marker
+    ///
+    /// Honors the user's actual selection — so a Houston user gets
+    /// `Houston, United States` even though their IANA zone is
+    /// `America/Chicago`. Returns nil if the key is missing or malformed.
+    private static func selectedCityFromSystemPreferences() -> (city: String, country: String)? {
+        let key = "com.apple.TimeZonePref.Last_Selected_City"
+        guard let array = UserDefaults.standard.array(forKey: key),
+              array.count >= 7 else {
+            return nil
+        }
+        // Prefer localized variants (indices 7/8); fall back to English (5/6).
+        let cityOpt: String?
+        let countryOpt: String?
+        if array.count >= 9,
+           let cityLoc = array[7] as? String, !cityLoc.isEmpty {
+            cityOpt = cityLoc
+            countryOpt = array[8] as? String
+        } else {
+            cityOpt = array[5] as? String
+            countryOpt = array[6] as? String
+        }
+        guard let city = cityOpt, !city.isEmpty else { return nil }
+        return (city: city, country: countryOpt ?? "")
+    }
 
+    /// Returns `CITY, COUNTRY` for the current time zone. Tries three
+    /// sources in order:
+    ///   1. macOS Date & Time pane's "Closest City" selection (honors the
+    ///      user's actual pick — e.g., Houston instead of Chicago).
+    ///   2. Curated `cityLookup` table (for IANA zones we've mapped to a
+    ///      reasonable city/state/country string).
+    ///   3. Parsed IANA identifier + Locale-localized country name (fallback).
+    /// Uppercased and diacritic-stripped to match the alphabet's coverage.
+    private static func currentTimeZoneCity() -> String {
         let raw: String
-        if let table = cityLookup[identifier] {
+
+        if let selected = selectedCityFromSystemPreferences() {
+            // (1) User's closest-city selection from macOS prefs.
+            raw = selected.country.isEmpty
+                ? selected.city
+                : "\(selected.city), \(selected.country)"
+        } else if let table = cityLookup[TimeZone.current.identifier] {
+            // (2) Curated lookup.
             raw = table
         } else {
-            // Fallback: parse "Region/City" from the IANA identifier and
-            // append the localized country name.
+            // (3) Parse "Region/City" from IANA + Locale country name.
+            let identifier = TimeZone.current.identifier
             let cityRaw = identifier.split(separator: "/").last.map(String.init) ?? identifier
             let city = cityRaw.replacingOccurrences(of: "_", with: " ")
             let regionCode = Locale.current.region?.identifier
