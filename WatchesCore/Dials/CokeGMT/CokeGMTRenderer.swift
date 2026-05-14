@@ -1065,19 +1065,22 @@ public final class CokeGMTRenderer: DialRenderer {
         return path
     }
 
-    /// Pass-3: clean diamond hour hand. Replaces the snowflake's
-    /// chamfered-octagonal lozenge with a simple 4-vertex diamond — the
-    /// geometric simplicity matches the GMT hand's triangle arrowhead.
-    /// 7 vertices total: shaft (rectangular) + diamond near tip + tip
-    /// point.
+    /// Pass-3.1: 90°-cornered diamond hour hand — a square rotated 45°
+    /// at the tip of a slim shaft. For 90° corners the diamond's
+    /// vertical half-span MUST equal its horizontal half-span (proof:
+    /// dot product of the two sides meeting at any vertex is zero
+    /// iff the half-widths are equal). The lozenge is therefore a
+    /// `width × width` rhombus oriented point-up.
     private func diamondHandPath(width: CGFloat, length: CGFloat) -> CGPath {
         let path = CGMutablePath()
         let cx = width / 2
         let shaftWidth = width * 0.20
-        let diamondStartY = length * 0.55     // shaft ends here
-        let diamondMidY = length * 0.78       // widest point of diamond
         let diamondHalfWidth = width * 0.50
+        // Square-turned-45°: half-height equals half-width.
+        let diamondHalfHeight = diamondHalfWidth
         let tipY = length
+        let diamondMidY = tipY - diamondHalfHeight
+        let diamondStartY = diamondMidY - diamondHalfHeight
 
         // CCW from pivot right.
         path.move(to: CGPoint(x: cx + shaftWidth / 2, y: 0))

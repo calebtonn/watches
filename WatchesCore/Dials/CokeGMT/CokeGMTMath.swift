@@ -52,15 +52,22 @@ public enum CokeGMTMath {
         return position * (.pi / 30.0)
     }
 
-    /// Second-hand rotation angle in radians, clockwise from 12. Discrete
-    /// per-second jump (no sub-second fraction); reduce-motion freezes the
-    /// hand entirely.
+    /// Second-hand rotation angle in radians, clockwise from 12.
+    /// **Pass-3 update:** smooth sweep using sub-second precision from
+    /// the date's nanosecond component, matching a mechanical
+    /// sweeping-seconds movement. Reduce-motion freezes the hand
+    /// entirely (the renderer skips the update under reduce-motion).
+    ///
+    /// At second.nanosecond == 0 the angle is identical to the prior
+    /// per-second-tick math; tests at exact integer seconds still pass.
     public static func secondAngle(
         from date: Date,
         calendar: Calendar
     ) -> CGFloat {
-        let s = calendar.dateComponents([.second], from: date).second ?? 0
-        return CGFloat(s) * (.pi / 30.0)
+        let comps = calendar.dateComponents([.second, .nanosecond], from: date)
+        let s = CGFloat(comps.second ?? 0)
+        let n = CGFloat(comps.nanosecond ?? 0) / 1_000_000_000.0
+        return (s + n) * (.pi / 30.0)
     }
 
     // MARK: - GMT hand angle (24-hour scale, UTC source)
