@@ -253,6 +253,37 @@ reads clearly without fighting the recess gradient).
 The faceplate stays as a flat silver fill — by contrast it now reads as
 matte. No additional faceplate texture needed.
 
+## Polish pass C — composition mirror (2026-05-13)
+
+After side-by-side measurement against the Lange 1 reference photo, retuned
+positions, sizes, and the moonphase aperture shape to mirror the reference:
+
+1. **Layout anchors** —
+   - `mainTimeCenter` ( -0.22, +0.02 ) → ( -0.13, -0.05 )
+   - `mainTimeRadius` 0.48 → 0.50
+   - `bigDateCenter` ( +0.42, +0.45 ) → ( +0.22, +0.45 )
+   - `bigDateHeight` 0.22 → 0.16
+   - `subSecondsCenter` ( +0.38, -0.42 ) → ( +0.30, -0.45 )
+   - `powerReserveCenter` ( +0.55, -0.02 ) → ( +0.55, -0.08 )
+   - `powerReserveRadius` 0.20 → 0.30 (taller-vertical-feel arc)
+2. **Romans + lozenge markers pushed to perimeter** —
+   `romanRadius` 0.68·r → 0.82·r; `markerCenterR` 0.83·r → 0.92·r; minute
+   ticks pulled outward to 0.95-0.99·r so they don't collide with markers.
+3. **Moonphase aperture became a wide horizontal oval** — `buildAperturePath`
+   now traces the top with two cubic Beziers (using the 4·(√2-1)/3 ≈ 0.5523
+   ellipse-approximation constant) instead of `addArc`. New
+   `moonphaseHalfHeight = moonphaseHalfWidth * 0.55` gives the Lange-1
+   ~2:1 width-to-height ratio. Hill peak height scaled to the new
+   aperture height. Moon disc + man-in-the-moon re-anchored for the
+   shorter aperture; stars repositioned to left/right margins where the
+   moon doesn't cover at full-moon position.
+4. **Power reserve** — narrower angular span (`π/2 → π/2.2`, ~82°) gives
+   a less-arc-like, more vertical-scale appearance.
+
+Sub-seconds and big-date intentionally overlap the main time outer ring,
+matching the reference photo where these elements visibly intrude on the
+main sub-dial's perimeter.
+
 ## Open follow-ups
 
 - Stars are very small and easy to miss at typical screensaver size. May
@@ -261,5 +292,3 @@ matte. No additional faceplate texture needed.
 - At certain moon phases (e.g., near new moon), only a thin sliver of moon
   shows. Visually correct but may want a tiny opacity bump on the navy sky
   decoration so the aperture doesn't feel empty.
-- If we want even more "polished" feel, could add a second smaller, brighter
-  highlight on top of the main gloss (specular hot-spot).

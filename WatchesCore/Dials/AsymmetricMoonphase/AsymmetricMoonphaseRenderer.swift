@@ -542,46 +542,51 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         bezelInnerShadow.path = CGPath(ellipseIn: dialRect, transform: nil)
         bezelInnerShadow.lineWidth = max(0.5, caseRadius * 0.006)
 
-        // Per-readout anchors (canvas-coords). Tuned in the Story 1.6 polish
-        // pass: main time bigger, big-date/sub-seconds slid right to clear it,
-        // power reserve sized down and pulled inward.
+        // Per-readout anchors (canvas-coords). Pass C — mirror reference
+        // proportions. Main time grown to dominate the left half; big date
+        // and sub-seconds pulled left into a center-right column; power
+        // reserve enlarged at the right edge.
         let mainTimeCenter = CGPoint(
-            x: caseCenter.x - dialRadius * 0.22,
-            y: caseCenter.y + dialRadius * 0.02
+            x: caseCenter.x - dialRadius * 0.13,
+            y: caseCenter.y - dialRadius * 0.05
         )
-        let mainTimeRadius = dialRadius * 0.48
+        let mainTimeRadius = dialRadius * 0.50
 
-        // Moonphase aperture inside main time sub-dial. `moonphaseCenter`
-        // is the BASELINE-center of the aperture (the flat-with-bites edge);
-        // the top of the aperture is a semicircle of radius == halfWidth.
+        // Moonphase aperture inside main time sub-dial. `moonphaseCenter` is
+        // the BASELINE-center of the aperture; the top is a *wide oval* —
+        // height ≈ 0.55 × half-width — traced with cubic Beziers (not an
+        // addArc semicircle).
         let moonphaseCenter = CGPoint(
             x: mainTimeCenter.x,
-            y: mainTimeCenter.y + mainTimeRadius * 0.30
+            y: mainTimeCenter.y + mainTimeRadius * 0.34
         )
-        let moonphaseHalfWidth = mainTimeRadius * 0.40
-        let moonphaseHalfHeight = moonphaseHalfWidth   // semicircular top
+        let moonphaseHalfWidth = mainTimeRadius * 0.34
+        let moonphaseHalfHeight = moonphaseHalfWidth * 0.55   // wide oval, h<w
 
-        // Big date — top-right
+        // Big date — upper center-right. Positioned so the box clears the
+        // main time outer ring at the top-right (allowing slight overlap
+        // with main time's silver face, like the reference).
         let bigDateCenter = CGPoint(
-            x: caseCenter.x + dialRadius * 0.42,
+            x: caseCenter.x + dialRadius * 0.22,
             y: caseCenter.y + dialRadius * 0.45
         )
-        let bigDateHeight = dialRadius * 0.22
+        let bigDateHeight = dialRadius * 0.16
 
-        // Sub-seconds — bottom-right
+        // Sub-seconds — lower center-right, partially overlapping main time
+        // at the upper-left edge (like the reference).
         let subSecondsCenter = CGPoint(
-            x: caseCenter.x + dialRadius * 0.38,
-            y: caseCenter.y - dialRadius * 0.42
+            x: caseCenter.x + dialRadius * 0.30,
+            y: caseCenter.y - dialRadius * 0.45
         )
         let subSecondsRadius = dialRadius * 0.20
 
-        // Power reserve — right side, pulled inward to match reference photo
-        // (sits clearly within the dial face, not at the bezel edge).
+        // Power reserve — right edge, larger arc for the tall-vertical Lange
+        // power-reserve feel.
         let powerReserveCenter = CGPoint(
             x: caseCenter.x + dialRadius * 0.55,
-            y: caseCenter.y - dialRadius * 0.02
+            y: caseCenter.y - dialRadius * 0.08
         )
-        let powerReserveRadius = dialRadius * 0.20
+        let powerReserveRadius = dialRadius * 0.30
 
         anchors = LayoutAnchors(
             caseCenter: caseCenter,
@@ -649,8 +654,8 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         // (built below in markersPath). Only the minute ticks live in this
         // layer — small lines around the perimeter, skipping multiples of 5.
         let ticksPath = CGMutablePath()
-        let minuteTickR = r * 0.97
-        let minuteTickInner = r * 0.92
+        let minuteTickR = r * 0.99
+        let minuteTickInner = r * 0.95
         for i in 0..<60 where i % 5 != 0 {
             let theta = .pi / 2 - (CGFloat(i) / 60) * 2 * .pi
             let dx = cos(theta)
@@ -667,9 +672,9 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         // (1, 2, 4, 5, 7, 8, 10, 11). Each is a 4-sided diamond pointing
         // radially outward from the sub-dial center.
         let markersPath = CGMutablePath()
-        let markerCenterR = r * 0.83        // distance from sub-dial center
-        let markerLong = r * 0.10           // radial length of the lozenge
-        let markerWide = r * 0.034          // perpendicular width of the lozenge
+        let markerCenterR = r * 0.92        // distance from sub-dial center
+        let markerLong = r * 0.08           // radial length of the lozenge
+        let markerWide = r * 0.030          // perpendicular width of the lozenge
         let nonCardinals = [1, 2, 4, 5, 7, 8, 10, 11]
         for i in nonCardinals {
             let theta = .pi / 2 - (CGFloat(i) / 12) * 2 * .pi
@@ -702,8 +707,8 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
             -.pi / 2,    // 6 (bottom)
             .pi,         // 9 (left)
         ]
-        let romanRadius = r * 0.68
-        let romanFontSize = r * 0.20
+        let romanRadius = r * 0.82
+        let romanFontSize = r * 0.16
         let romanFont = serifFont(size: romanFontSize, bold: false)
         let romansPath = CGMutablePath()
         for (i, roman) in romans.enumerated() {
@@ -764,34 +769,35 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         let cx = a.moonphaseCenter.x        // baseline center
         let baseY = a.moonphaseCenter.y
         let hw = a.moonphaseHalfWidth
-        // Bounding rect of the aperture: full-width × top-arc-height,
-        // rising upward from the baseline.
-        let apertureRect = CGRect(x: cx - hw, y: baseY, width: hw * 2, height: hw)
+        let hh = a.moonphaseHalfHeight      // full apex height of the oval
+        // Bounding rect of the aperture: width = 2·hw, height = hh, rising
+        // upward from the baseline (Lange 1's wide-oval aperture).
+        let apertureRect = CGRect(x: cx - hw, y: baseY, width: hw * 2, height: hh)
         let aperturePath = buildAperturePath(in: apertureRect)
 
         // Sky fills the aperture.
         moonphaseSkyLayer.frame = CGRect(origin: .zero, size: canvas)
         moonphaseSkyLayer.path = aperturePath
 
-        // Stars (decorative 4-point gold stars) sprinkled in the peripheral
-        // navy regions of the aperture — placed where the moon disc does
-        // NOT cover at full-moon position (so they remain visible).
+        // Stars in the left/right margins of the wide-oval aperture (where
+        // the moon disc doesn't cover at the full-moon position). fx is
+        // normalized to half-width; fy is normalized to full aperture height.
         let starsPath = CGMutablePath()
         let starOuter = hw * 0.05
         let starInner = starOuter * 0.40
         let starPositions: [(CGFloat, CGFloat)] = [
-            (-0.78, 0.45),
-            (-0.55, 0.80),
-            (-0.18, 0.92),
-            ( 0.20, 0.94),
-            ( 0.55, 0.82),
-            ( 0.78, 0.46),
-            ( 0.88, 0.20),
-            (-0.88, 0.22),
+            (-0.85, 0.45),
+            (-0.65, 0.75),
+            (-0.50, 0.25),
+            ( 0.50, 0.25),
+            ( 0.65, 0.78),
+            ( 0.85, 0.45),
+            (-0.92, 0.20),
+            ( 0.92, 0.22),
         ]
         for (fx, fy) in starPositions {
             let sx = cx + fx * hw
-            let sy = baseY + fy * hw
+            let sy = baseY + fy * hh
             starsPath.addPath(fourPointStar(at: CGPoint(x: sx, y: sy),
                                             outerRadius: starOuter,
                                             innerRadius: starInner))
@@ -821,10 +827,13 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         // through the (stationary) aperture mask.
         moonphaseMovingLayer.frame = moonphaseDiscContainer.bounds
 
-        let discR = hw * 0.46
+        // Moon disc sized to match the aperture height. The aperture is
+        // wider than tall, so the disc no longer touches the left/right —
+        // leaves room for stars in the side regions.
+        let discR = hh * 0.62
         let moonCenterLocal = CGPoint(
             x: localApertureRect.midX,
-            y: localApertureRect.minY + hw * 0.52
+            y: localApertureRect.minY + hh * 0.58
         )
         moonphaseDiscLayer.frame = CGRect(
             x: moonCenterLocal.x - discR, y: moonCenterLocal.y - discR,
@@ -899,11 +908,11 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         return path
     }
 
-    /// Build the aperture path: top semicircle + scalloped bottom with two
-    /// flat upward "rolling hills" cutting into the aperture from the
-    /// baseline. The hills use quadratic Beziers so width and height are
-    /// independent — this is what gives the moonphase aperture its Lange-1
-    /// "moon over rolling hills" silhouette without becoming heart-shaped.
+    /// Build the aperture path: top **elliptical** arc + scalloped bottom
+    /// with two subtle upward "rolling hills" cutting into the aperture.
+    /// The top arc uses two cubic Beziers so width and height are
+    /// independently controllable (`rect.height` ≠ `rect.width / 2`),
+    /// matching the Lange 1's wide-horizontal-oval aperture proportion.
     private func buildAperturePath(in rect: CGRect) -> CGPath {
         let path = CGMutablePath()
         let cx = rect.midX
@@ -911,32 +920,39 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         let leftX = rect.minX
         let rightX = rect.maxX
         let hw = rect.width / 2
-        let topRadius = hw
+        let hh = rect.height                  // full top-arc height (rect taller-than-half: yes — rect spans baseY..baseY+hh)
 
         // Hills are SUBTLE — they only need to nibble the bottom of the
         // moon disc as it slides through. Per the Lange 1 reference, the
         // arches are barely perceptible (often hidden behind the hands).
         let hillHalfWidth = hw * 0.30
         let hillGap = hw * 0.10
-        let hillHeight = hw * 0.06
+        let hillHeight = hh * 0.18           // scale relative to aperture height now
 
         let rightHillLeft = cx + hillGap
         let rightHillRight = rightHillLeft + hillHalfWidth * 2
         let leftHillRight = cx - hillGap
         let leftHillLeft = leftHillRight - hillHalfWidth * 2
 
-        // Quadratic Bezier peaks at (baseY + controlY)/2, so for an apex of
-        // `hillHeight` above the baseline we set control y = baseY + 2*hillHeight.
+        // Quadratic Bezier peak = midpoint of (baseY, controlY).
         let controlYOffset = hillHeight * 2
 
+        // Cubic-Bezier ellipse-arc magic constant: 4·(√2−1)/3 ≈ 0.5523.
+        // Approximates a quarter-ellipse using one cubic.
+        let kappa: CGFloat = 0.5522847498307933
+
         path.move(to: CGPoint(x: leftX, y: baseY))
-        // Top semicircle from left base CCW (in y-up) up and over to right base.
-        path.addArc(
-            center: CGPoint(x: cx, y: baseY),
-            radius: topRadius,
-            startAngle: .pi,
-            endAngle: 0,
-            clockwise: false
+        // Top: two cubic-Bezier segments tracing the upper half of the
+        // ellipse (-hw, 0) → (0, hh) → (hw, 0). Each is a quarter-ellipse.
+        path.addCurve(
+            to: CGPoint(x: cx, y: baseY + hh),
+            control1: CGPoint(x: leftX,            y: baseY + hh * kappa),
+            control2: CGPoint(x: cx - hw * kappa,  y: baseY + hh)
+        )
+        path.addCurve(
+            to: CGPoint(x: rightX, y: baseY),
+            control1: CGPoint(x: cx + hw * kappa,  y: baseY + hh),
+            control2: CGPoint(x: rightX,           y: baseY + hh * kappa)
         )
         // Now at (rightX, baseY). Walk leftward across the baseline, with
         // two upward-curving hills cutting INTO the aperture.
@@ -1202,9 +1218,11 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         // end (-π/4). Arc sweeps clockwise through 0 (rightmost point).
         //
         // y-up Core Animation angles: 0=right, π/2=up, π=left, -π/2=down.
-        let arcSpan: CGFloat = .pi / 2  // 90° total arc
-        let aufAngle: CGFloat = arcSpan / 2     // +π/4 (upper-right)
-        let abAngle: CGFloat = -arcSpan / 2     // -π/4 (lower-right)
+        // Narrower angular span (~82°) with a larger radius gives the
+        // "tall vertical scale" feel of the Lange 1 power reserve.
+        let arcSpan: CGFloat = .pi / 2.2
+        let aufAngle: CGFloat = arcSpan / 2     // upper-right
+        let abAngle: CGFloat = -arcSpan / 2     // lower-right
         powerReserveAUFAngle = aufAngle
         powerReserveABAngle = abAngle
         powerReservePivot = CGPoint(x: cx, y: cy)
