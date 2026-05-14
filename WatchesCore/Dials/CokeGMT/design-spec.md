@@ -54,6 +54,45 @@ rather than layout geometry.
 
 ---
 
+## Notes on Pass 3 (2026-05-14)
+
+After Pass 2 shipped, Caleb gave seven new findings that drove a Pass-3
+re-implementation. The user feedback was specific enough that no
+designer-agent re-pass was needed; the implementer applied the changes
+directly and the spec is now updated post-hoc with `(updated Pass 3 — …)`
+markers to keep the spec the source of truth for the renderer.
+
+**The seven Pass-3 changes:**
+
+1. **Bezel widened.** `bezelOuterR = caseRadius * 1.00` (was 0.99) —
+   the bezel now goes to the case edge. `bezelInnerR = caseRadius *
+   0.82` (was 0.88). Radial thickness `0.11 → 0.18 · caseRadius` —
+   ~64% wider. Dial shrinks to `caseRadius * 0.78`.
+2. **Knurling.** 120 short radial teeth at `caseRadius * 0.985 → 1.00`
+   around the bezel outer edge. Dark-stroked thin lines, evenly
+   spaced (every 3°).
+3. **Bezel numerals: bigger + RADIALLY ORIENTED.** Font `caseRadius *
+   0.060 → 0.080`. Each glyph rotated by `(angle - π/2)` so its +y
+   axis points radially outward. The Pass-1 "upright in wearer's
+   frame" rule is REVERSED — radial orientation matches the Tudor
+   reference's bezel.
+4. **Triangle pip bigger.** Tip-to-base length `caseRadius * 0.030
+   → 0.050`; base half-width `0.022 → 0.030`.
+5. **Sword minute hand.** New `swordHandPath` helper replaces the
+   snowflake for the minute hand. Straight parallel-sided shaft,
+   tapers to a sharp tip. No lozenge. The snowflake silhouette
+   belongs only to the hour hand on modern Tudor BB GMTs.
+6. **Clean diamond hour hand.** New `diamondHandPath` helper — slim
+   shaft + 4-vertex diamond near the tip (no chamfering). Replaces
+   the Pass-2 snowflake. Geometrically simpler; matches the GMT
+   arrow's clean polygon aesthetic.
+7. **Sapphire crystal effect.** The annulus between `dialRadius` and
+   `bezelInnerR` is now a translucent gradient (axial, upper-left
+   bright → lower-right transparent) with a bright refraction arc
+   on the upper-left rim. Replaces the solid silver chamfer ring.
+   This is the "bomber photo-realistic feature" Caleb explicitly
+   asked for.
+
 ## Notes on Pass 2 (2026-05-14)
 
 Pass-1 shipped structurally complete. Caleb reviewed

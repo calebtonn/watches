@@ -59,6 +59,7 @@ public final class CokeGMTRenderer: DialRenderer {
     private let bezelBlackGradient = CAGradientLayer()
     private let bezelRedHalf = CAShapeLayer()
     private let bezelRedGradient = CAGradientLayer()
+    private let bezelKnurlingLayer = CAShapeLayer()   // Pass-3: outer-edge teeth
     private let bezelCeramicSheen = CAShapeLayer()
     private let bezelMidArcSheen = CAShapeLayer()    // Pass-2 Element 22 — curved-surface highlight
     private let bezelInnerGroove = CAShapeLayer()
@@ -71,6 +72,8 @@ public final class CokeGMTRenderer: DialRenderer {
     private let dialFaceLayer = CAShapeLayer()
     private let dialVignetteLayer = CAGradientLayer()
     private let dialGrainLayer = CALayer()
+    private let crystalGlassLayer = CAGradientLayer()    // Pass-3: sapphire crystal annulus
+    private let crystalRimHighlight = CAShapeLayer()     // Pass-3: bright refraction arc at upper-left
 
     private let minuteTrackMinorTicks = CAShapeLayer()
     private let minuteTrackMajorTicks = CAShapeLayer()
@@ -278,6 +281,13 @@ public final class CokeGMTRenderer: DialRenderer {
         bezelInnerGroove.strokeColor = NSColor(white: 0.0, alpha: 0.60).cgColor
         canvasBackground.addSublayer(bezelInnerGroove)
 
+        // Pass-3: knurled outer-edge teeth around the bezel rim. Cream-gold
+        // to read as polished metal rim, not as ticks.
+        bezelKnurlingLayer.fillColor = nil
+        bezelKnurlingLayer.strokeColor = NSColor(white: 0.0, alpha: 0.55).cgColor
+        bezelKnurlingLayer.lineCap = .butt
+        canvasBackground.addSublayer(bezelKnurlingLayer)
+
         bezelTicksLayer.fillColor = CokeGMTPalette.bezelNumeralCream
         bezelTicksLayer.strokeColor = nil
         canvasBackground.addSublayer(bezelTicksLayer)
@@ -295,10 +305,36 @@ public final class CokeGMTRenderer: DialRenderer {
         bezelPipLayer.shadowRadius = 1.0
         canvasBackground.addSublayer(bezelPipLayer)
 
-        // Polished chamfer ring + outer bezel rim + glints.
+        // Pass-3: chamferRingLayer is REPURPOSED as a very subtle dark
+        // engraved-channel stroke at the dial boundary (lower-contrast
+        // than the Pass-2 "polished steel" appearance) so the sapphire
+        // crystal effect above can dominate.
         chamferRingLayer.fillColor = nil
-        chamferRingLayer.strokeColor = CokeGMTPalette.caseSteelHighlight
+        chamferRingLayer.strokeColor = NSColor(white: 0.0, alpha: 0.45).cgColor
         canvasBackground.addSublayer(chamferRingLayer)
+
+        // Pass-3: sapphire crystal annulus (between dialRadius and
+        // bezelInnerR). A translucent CAGradientLayer that brightens
+        // toward the upper-left to suggest the glass dome catching light.
+        crystalGlassLayer.type = .axial
+        crystalGlassLayer.startPoint = CGPoint(x: 0.20, y: 1.00)
+        crystalGlassLayer.endPoint = CGPoint(x: 0.85, y: 0.05)
+        crystalGlassLayer.colors = [
+            NSColor(white: 1.0, alpha: 0.28).cgColor,
+            NSColor(white: 1.0, alpha: 0.10).cgColor,
+            NSColor(white: 1.0, alpha: 0.0).cgColor,
+            NSColor(white: 0.6, alpha: 0.08).cgColor,
+        ]
+        crystalGlassLayer.locations = [0.0, 0.35, 0.65, 1.0]
+        canvasBackground.addSublayer(crystalGlassLayer)
+
+        // Pass-3: bright refraction arc on the upper-left rim of the
+        // crystal — the bright sliver where studio light catches the
+        // domed edge of the sapphire glass.
+        crystalRimHighlight.fillColor = nil
+        crystalRimHighlight.strokeColor = NSColor(white: 1.0, alpha: 0.65).cgColor
+        crystalRimHighlight.lineCap = .round
+        canvasBackground.addSublayer(crystalRimHighlight)
 
         polishedRimLayer.fillColor = nil
         polishedRimLayer.strokeColor = CokeGMTPalette.caseSteelHighlight
@@ -474,12 +510,17 @@ public final class CokeGMTRenderer: DialRenderer {
 
         canvasBackground.frame = CGRect(origin: .zero, size: canvas)
 
+        // Pass-3: bezel widened significantly. Outer pushed to the case
+        // edge (was 0.99 → 1.00); inner pulled inward (was 0.88 → 0.82)
+        // for a much chunkier bezel that matches the reference's
+        // sport-watch proportions. The dial shrinks to 0.78 with a thin
+        // sapphire-crystal annulus from 0.78 → 0.82.
         let caseDiameter = min(canvas.width, canvas.height) * 0.85
         let caseRadius = caseDiameter / 2
         let caseCenter = CGPoint(x: canvas.width / 2, y: canvas.height / 2)
-        let dialRadius = caseRadius * 0.80
-        let bezelInnerR = caseRadius * 0.88
-        let bezelOuterR = caseRadius * 0.99
+        let dialRadius = caseRadius * 0.78
+        let bezelInnerR = caseRadius * 0.82
+        let bezelOuterR = caseRadius * 1.00
 
         anchors = LayoutAnchors(
             caseCenter: caseCenter,
@@ -505,25 +546,12 @@ public final class CokeGMTRenderer: DialRenderer {
         caseTopMask.frame = caseTopGradient.bounds
         caseTopMask.path = CGPath(ellipseIn: caseRect, transform: nil)
 
-        // Brushed overlay clipped to the chamfer ring (annulus between
-        // dialRadius and bezelInnerR).
-        caseBrushLayer.frame = caseRect
-        let brushMask = CAShapeLayer()
-        brushMask.frame = caseBrushLayer.bounds
-        let brushPath = CGMutablePath()
-        // Annulus = outer minus inner (even-odd)
-        brushPath.addEllipse(in: CGRect(
-            x: caseRadius - bezelInnerR + 0, y: caseRadius - bezelInnerR + 0,
-            width: bezelInnerR * 2, height: bezelInnerR * 2
-        ))
-        brushPath.addEllipse(in: CGRect(
-            x: caseRadius - dialRadius, y: caseRadius - dialRadius,
-            width: dialRadius * 2, height: dialRadius * 2
-        ))
-        brushMask.path = brushPath
-        brushMask.fillRule = .evenOdd
-        brushMask.fillColor = NSColor.white.cgColor
-        caseBrushLayer.mask = brushMask
+        // Pass-3: the brushed-steel chamfer no longer has visible real
+        // estate (the bezel now extends to the case edge, and the area
+        // between the bezel inner and the dial is the sapphire crystal).
+        // Hide the layer rather than removing it so the install code
+        // stays simple.
+        caseBrushLayer.opacity = 0.0
 
         // Bezel halves — Pass-2 corrected angle convention.
         // Black covers the UPPER semicircle (over the top), red covers the
@@ -581,6 +609,26 @@ public final class CokeGMTRenderer: DialRenderer {
         ), transform: nil)
         bezelInnerGroove.lineWidth = max(0.4, caseRadius * 0.003)
 
+        // Pass-3: knurling — 120 small radial teeth around the outer
+        // bezel edge. Inner radius caseRadius * 0.985, outer 1.00.
+        // Drawn as short lines with butt cap so each tooth reads as a
+        // discrete grip serration.
+        let knurlingPath = CGMutablePath()
+        let teethCount = 120
+        let knurlInner = caseRadius * 0.985
+        let knurlOuter = caseRadius * 1.000
+        for i in 0..<teethCount {
+            let angle = CGFloat(i) / CGFloat(teethCount) * 2 * .pi
+            let dx = cos(angle), dy = sin(angle)
+            knurlingPath.move(to: CGPoint(x: caseCenter.x + dx * knurlInner,
+                                          y: caseCenter.y + dy * knurlInner))
+            knurlingPath.addLine(to: CGPoint(x: caseCenter.x + dx * knurlOuter,
+                                             y: caseCenter.y + dy * knurlOuter))
+        }
+        bezelKnurlingLayer.frame = CGRect(origin: .zero, size: canvas)
+        bezelKnurlingLayer.path = knurlingPath
+        bezelKnurlingLayer.lineWidth = max(0.5, caseRadius * 0.005)
+
         // 24h tick marks at odd hours (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23).
         let numeralR = (bezelOuterR + bezelInnerR) / 2
         let tickLength = caseRadius * 0.022
@@ -607,8 +655,12 @@ public final class CokeGMTRenderer: DialRenderer {
         bezelTicksLayer.frame = CGRect(origin: .zero, size: canvas)
         bezelTicksLayer.path = ticksPath
 
-        // 24h numerals at even hours, upright in the wearer's frame.
-        let numFont = bezelFont(size: caseRadius * 0.060)
+        // Pass-3: 24h numerals are now BIGGER (0.060 → 0.080) and
+        // RADIALLY ORIENTED — each glyph rotates so its +y axis points
+        // outward from the dial center. At "24" (top) the digit reads
+        // upright; at "12" (bottom) it reads inverted; at "6" (right)
+        // it reads sideways. Matches the Tudor reference.
+        let numFont = bezelFont(size: caseRadius * 0.080)
         let numeralsPath = CGMutablePath()
         for h in stride(from: 2, through: 22, by: 2) {
             let angle = .pi / 2 - CGFloat(h) / 24.0 * 2 * .pi
@@ -616,19 +668,22 @@ public final class CokeGMTRenderer: DialRenderer {
             let ny = caseCenter.y + sin(angle) * numeralR
             if let glyphs = textPath(string: "\(h)", font: numFont) {
                 let bounds = glyphs.boundingBox
-                let tx = nx - bounds.midX
-                let ty = ny - bounds.midY
-                let t = CGAffineTransform(translationX: tx, y: ty)
-                numeralsPath.addPath(glyphs, transform: t)
+                // Compose: center glyph at origin → rotate to point
+                // radially outward → translate to numeral position.
+                let transform = CGAffineTransform.identity
+                    .translatedBy(x: nx, y: ny)
+                    .rotated(by: angle - .pi / 2)
+                    .translatedBy(x: -bounds.midX, y: -bounds.midY)
+                numeralsPath.addPath(glyphs, transform: transform)
             }
         }
         bezelNumeralsLayer.frame = CGRect(origin: .zero, size: canvas)
         bezelNumeralsLayer.path = numeralsPath
 
-        // Triangle pip at 24/00 (top, angle π/2).
-        let pipTipR = bezelInnerR + caseRadius * 0.008
-        let pipBaseR = bezelInnerR + caseRadius * 0.038
-        let pipHalfW = caseRadius * 0.022
+        // Triangle pip at 24/00 (top, angle π/2). Pass-3: larger.
+        let pipTipR = bezelInnerR + caseRadius * 0.012
+        let pipBaseR = bezelInnerR + caseRadius * 0.062  // was 0.038 → 0.062 (~65% taller)
+        let pipHalfW = caseRadius * 0.030                // was 0.022 (~35% wider)
         let pipPath = CGMutablePath()
         let pipTip = CGPoint(x: caseCenter.x, y: caseCenter.y + pipTipR)
         let pipR = CGPoint(x: caseCenter.x + pipHalfW, y: caseCenter.y + pipBaseR)
@@ -642,23 +697,23 @@ public final class CokeGMTRenderer: DialRenderer {
         bezelPipLayer.shadowPath = pipPath
         bezelPipLayer.lineWidth = max(0.6, caseRadius * 0.0035)
 
-        // Chamfer ring (radii 0.80–0.82 — drawn as stroke at 0.81).
+        // Pass-3: chamfer ring repurposed as a subtle dark engraved-channel
+        // stroke at the dial boundary (the "where the dial meets the
+        // sapphire" edge). Quiet so the crystal effect dominates.
         chamferRingLayer.frame = CGRect(origin: .zero, size: canvas)
-        chamferRingLayer.path = CGPath(ellipseIn: CGRect(
-            x: caseCenter.x - caseRadius * 0.81, y: caseCenter.y - caseRadius * 0.81,
-            width: caseRadius * 1.62, height: caseRadius * 1.62
-        ), transform: nil)
-        chamferRingLayer.lineWidth = max(1.0, caseRadius * 0.015)
+        chamferRingLayer.path = CGPath(ellipseIn: dialRect, transform: nil)
+        chamferRingLayer.lineWidth = max(0.5, caseRadius * 0.005)
 
-        // Polished outer rim.
+        // Polished outer rim — now sits at the very edge of the case
+        // (bezel goes to 1.00 in Pass-3).
         polishedRimLayer.frame = CGRect(origin: .zero, size: canvas)
         polishedRimLayer.path = CGPath(ellipseIn: CGRect(
-            x: caseCenter.x - caseRadius * 0.995, y: caseCenter.y - caseRadius * 0.995,
-            width: caseRadius * 1.99, height: caseRadius * 1.99
+            x: caseCenter.x - caseRadius, y: caseCenter.y - caseRadius,
+            width: caseDiameter, height: caseDiameter
         ), transform: nil)
-        polishedRimLayer.lineWidth = max(1.0, caseRadius * 0.012)
+        polishedRimLayer.lineWidth = max(0.5, caseRadius * 0.006)
 
-        // Glints — upper-left arcs (CCW from a low angle to a higher angle).
+        // Outer rim glint — bright arc on the upper-left of the bezel edge.
         let outerGlintR = caseRadius * 0.997
         let outerGlintPath = CGMutablePath()
         outerGlintPath.addArc(
@@ -670,21 +725,54 @@ public final class CokeGMTRenderer: DialRenderer {
         outerRimGlint.path = outerGlintPath
         outerRimGlint.lineWidth = max(1.2, caseRadius * 0.014)
 
-        let chamferGlintR = caseRadius * 0.815
-        let chamferGlintPath = CGMutablePath()
-        chamferGlintPath.addArc(
-            center: caseCenter, radius: chamferGlintR,
-            startAngle: 5 * .pi / 12, endAngle: 3 * .pi / 4,
+        // Pass-3: chamferGlint hidden — sapphire crystal rim highlight
+        // (`crystalRimHighlight`) replaces it.
+        chamferGlint.path = nil
+
+        // Pass-3: sapphire crystal annulus gradient. The gradient is
+        // axial (upper-left bright → lower-right transparent) and masked
+        // to the annulus between dialRadius and bezelInnerR. Sells the
+        // "translucent glass dome over the dial" effect.
+        let crystalRect = CGRect(
+            x: caseCenter.x - bezelInnerR,
+            y: caseCenter.y - bezelInnerR,
+            width: bezelInnerR * 2, height: bezelInnerR * 2
+        )
+        crystalGlassLayer.frame = crystalRect
+        let crystalMask = CAShapeLayer()
+        crystalMask.frame = CGRect(origin: .zero, size: crystalRect.size)
+        let crystalMaskPath = CGMutablePath()
+        crystalMaskPath.addEllipse(in: CGRect(
+            origin: .zero, size: crystalRect.size
+        ))
+        let dialInsetInCrystal = (crystalRect.width - dialRadius * 2) / 2
+        crystalMaskPath.addEllipse(in: CGRect(
+            x: dialInsetInCrystal, y: dialInsetInCrystal,
+            width: dialRadius * 2, height: dialRadius * 2
+        ))
+        crystalMask.path = crystalMaskPath
+        crystalMask.fillRule = .evenOdd
+        crystalMask.fillColor = NSColor.white.cgColor
+        crystalGlassLayer.mask = crystalMask
+
+        // Pass-3: bright refraction arc at the upper-left rim of the
+        // crystal — the glass dome catching studio key light.
+        let rimMidR = (bezelInnerR + dialRadius) / 2
+        let rimHighlightPath = CGMutablePath()
+        rimHighlightPath.addArc(
+            center: caseCenter, radius: rimMidR,
+            startAngle: 0.40 * .pi, endAngle: 0.95 * .pi,
             clockwise: false
         )
-        chamferGlint.frame = CGRect(origin: .zero, size: canvas)
-        chamferGlint.path = chamferGlintPath
-        chamferGlint.lineWidth = max(0.8, caseRadius * 0.010)
+        crystalRimHighlight.frame = CGRect(origin: .zero, size: canvas)
+        crystalRimHighlight.path = rimHighlightPath
+        crystalRimHighlight.lineWidth = max(0.6, (bezelInnerR - dialRadius) * 0.55)
 
-        // Inner edge stroke at dialRadius.
+        // Inner edge stroke at dialRadius — kept but subtler than Pass-2
+        // (the crystal layer above provides the "edge" feel).
         innerEdgeStroke.frame = CGRect(origin: .zero, size: canvas)
         innerEdgeStroke.path = CGPath(ellipseIn: dialRect, transform: nil)
-        innerEdgeStroke.lineWidth = max(0.4, caseRadius * 0.004)
+        innerEdgeStroke.lineWidth = max(0.4, caseRadius * 0.003)
 
         // Dial face fill.
         dialFaceLayer.frame = CGRect(origin: .zero, size: canvas)
@@ -837,19 +925,21 @@ public final class CokeGMTRenderer: DialRenderer {
         // Initial digit — overwritten on first tick.
         updateDateDigit(day: 0)
 
-        // Hands.
-        let hourLength = dialRadius * 0.48
+        // Hands. Pass-3: hour hand is now a clean 4-vertex diamond
+        // (no chamfering — matches the GMT hand's geometric simplicity);
+        // minute hand is a SWORD style (straight tapered, no lozenge).
+        let hourLength = dialRadius * 0.50
         let hourWidth = dialRadius * 0.16
-        let hourPath = snowflakeHandPath(width: hourWidth, length: hourLength, isMinute: false)
+        let hourPath = diamondHandPath(width: hourWidth, length: hourLength)
         let hourBounds = CGRect(x: 0, y: 0, width: hourWidth, height: hourLength)
         hourHandLayer.bounds = hourBounds
         hourHandLayer.position = caseCenter
         hourHandLayer.path = hourPath
         hourHandLayer.shadowPath = hourPath
 
-        let minuteLength = dialRadius * 0.88
-        let minuteWidth = dialRadius * 0.115
-        let minutePath = snowflakeHandPath(width: minuteWidth, length: minuteLength, isMinute: true)
+        let minuteLength = dialRadius * 0.90
+        let minuteWidth = dialRadius * 0.060   // slimmer than the chunky snowflake
+        let minutePath = swordHandPath(width: minuteWidth, length: minuteLength)
         let minuteBounds = CGRect(x: 0, y: 0, width: minuteWidth, height: minuteLength)
         minuteHandLayer.bounds = minuteBounds
         minuteHandLayer.position = caseCenter
@@ -971,6 +1061,53 @@ public final class CokeGMTRenderer: DialRenderer {
         path.addLine(to: CGPoint(x: cx - lozengeHalfWidth + lozengeChamfer, y: lozengeStartY))            // 13
         path.addLine(to: CGPoint(x: cx - shaftWidth / 2, y: lozengeStartY))                               // 14
         path.addLine(to: CGPoint(x: cx - shaftWidth / 2, y: 0))                                            // 15
+        path.closeSubpath()
+        return path
+    }
+
+    /// Pass-3: clean diamond hour hand. Replaces the snowflake's
+    /// chamfered-octagonal lozenge with a simple 4-vertex diamond — the
+    /// geometric simplicity matches the GMT hand's triangle arrowhead.
+    /// 7 vertices total: shaft (rectangular) + diamond near tip + tip
+    /// point.
+    private func diamondHandPath(width: CGFloat, length: CGFloat) -> CGPath {
+        let path = CGMutablePath()
+        let cx = width / 2
+        let shaftWidth = width * 0.20
+        let diamondStartY = length * 0.55     // shaft ends here
+        let diamondMidY = length * 0.78       // widest point of diamond
+        let diamondHalfWidth = width * 0.50
+        let tipY = length
+
+        // CCW from pivot right.
+        path.move(to: CGPoint(x: cx + shaftWidth / 2, y: 0))
+        path.addLine(to: CGPoint(x: cx + shaftWidth / 2, y: diamondStartY))
+        path.addLine(to: CGPoint(x: cx + diamondHalfWidth, y: diamondMidY))
+        path.addLine(to: CGPoint(x: cx, y: tipY))
+        path.addLine(to: CGPoint(x: cx - diamondHalfWidth, y: diamondMidY))
+        path.addLine(to: CGPoint(x: cx - shaftWidth / 2, y: diamondStartY))
+        path.addLine(to: CGPoint(x: cx - shaftWidth / 2, y: 0))
+        path.closeSubpath()
+        return path
+    }
+
+    /// Pass-3: sword minute hand. Straight parallel-sided shaft tapering
+    /// to a sharp point at the tip. No lozenge. Tudor minute hands on
+    /// many Black Bay variants are sword-style; the snowflake belongs
+    /// to the hour hand only.
+    private func swordHandPath(width: CGFloat, length: CGFloat) -> CGPath {
+        let path = CGMutablePath()
+        let cx = width / 2
+        let half = width / 2
+        let taperStartY = length * 0.82
+        let tipY = length
+
+        // CCW from pivot right.
+        path.move(to: CGPoint(x: cx + half, y: 0))
+        path.addLine(to: CGPoint(x: cx + half, y: taperStartY))
+        path.addLine(to: CGPoint(x: cx, y: tipY))
+        path.addLine(to: CGPoint(x: cx - half, y: taperStartY))
+        path.addLine(to: CGPoint(x: cx - half, y: 0))
         path.closeSubpath()
         return path
     }

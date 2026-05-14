@@ -246,6 +246,52 @@ Pass-2 markers. This implementation applies that diff.
 86 tests still pass. No protocol amendments, no ADRs. The picker's
 preview thumbnail was regenerated via DialSnapshot post-implementation.
 
+## Polish Pass 3 (Story 2.1.2, 2026-05-14)
+
+After Caleb reviewed the Pass-2 render he listed seven items. This pass
+applied them directly (no designer agent — the feedback was specific
+enough to be the spec).
+
+**Seven changes:**
+
+1. **Bigger bezel.** Outer pushed to `caseRadius * 1.00` (case edge);
+   inner pulled to `0.82`. Bezel radial thickness ~64% wider than
+   Pass-2. Dial shrinks to `caseRadius * 0.78`; the chamfer
+   annulus (`0.78 → 0.82`) becomes the sapphire crystal area.
+2. **Knurled outer edge.** 120 short radial teeth around the rim
+   (radii `0.985 → 1.00`). Cream-gold to read as polished metal grip.
+3. **Radially-oriented + bigger numerals.** Font `caseRadius * 0.060
+   → 0.080`. Each glyph rotated by `(angle - π/2)` so its local +y
+   axis points radially outward. "24" reads upright at top; "12"
+   reads upside-down at bottom; "6"/"18" read sideways.
+4. **Bigger triangle pip.** Tip-to-base length `caseRadius * 0.030 →
+   0.050`; base width `0.044 → 0.060`.
+5. **Sword minute hand.** New `swordHandPath(width:length:)` — straight
+   parallel-sided shaft tapering to a point at the tip. No lozenge.
+   Replaces the snowflake call.
+6. **Clean diamond hour hand.** New `diamondHandPath(width:length:)`
+   — slim shaft + 4-vertex diamond near the tip (no chamfering).
+   Geometrically simpler than the snowflake's octagonal lozenge;
+   matches the GMT hand's triangle aesthetic.
+7. **Sapphire crystal effect** (the "bomber photo-realistic feature").
+   New `crystalGlassLayer` (`CAGradientLayer` masked to the
+   annulus between `dialRadius` and `bezelInnerR`) with upper-left
+   bright → lower-right transparent stops. Plus
+   `crystalRimHighlight` (a thick stroked arc at the crystal
+   centerline from 0.40π to 0.95π — upper-left curve of the rim)
+   that catches the studio key light. Replaces the Pass-2 solid
+   silver chamfer ring.
+
+Bonus cleanups:
+- Pass-2 `chamferRingLayer` repurposed as a subtle dark engraved
+  stroke at the dial boundary (the "where dial meets sapphire" line).
+- Pass-2 `chamferGlint` hidden (its role is now served by
+  `crystalRimHighlight`).
+- Pass-2 `caseBrushLayer` opacity zeroed — the brushed-steel area
+  no longer exists (bezel covers what was the case top).
+
+86 tests still pass. No protocol amendments. 0 ADRs.
+
 ## Open follow-ups (deferred to Story 2.1.1 or later)
 
 - **Chevron-notched GMT arrowhead.** Spec Element 11 offers a chevron
