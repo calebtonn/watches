@@ -284,29 +284,39 @@ Sub-seconds and big-date intentionally overlap the main time outer ring,
 matching the reference photo where these elements visibly intrude on the
 main sub-dial's perimeter.
 
-## Polish pass D — hollow lozenges + dimensional markers (2026-05-13)
+## Polish pass D — raised hour markers + power reserve refinement (2026-05-13)
 
 After Caleb added two Lange 1 detail close-up reference images, the dial-level
 zoom revealed:
-1. Both hands have HOLLOW lozenges near the tip (you can see the dial
-   *through* the open lozenge frame), not solid gold blades.
-2. Hour markers read as RAISED 3D studs with shading, not flat lozenges.
-3. The power reserve scale is much more subtle than my earlier rendering —
+1. Hour markers read as RAISED 3D studs with shading, not flat lozenges.
+2. The power reserve scale is much more subtle than my earlier rendering —
    AUF / AB labels dominate, ticks are barely visible.
 
 Changes:
-1. **`goldHandPath` adds an inner lozenge subpath** at the blade tip,
-   inset to ~30% blade width × 80% blade vertical span. With `.evenOdd`
-   fill rule on the host layer (now enabled on hour, minute, AND power
-   reserve indicator), this renders as an open frame around the lozenge
-   hole. Minute hand keeps its separate pivot eye — both holes coexist as
-   non-nested subpaths under evenOdd.
-2. **`mainTimeHourMarkersLayer` gains a subtle CALayer drop shadow**
+1. **`mainTimeHourMarkersLayer` gains a subtle CALayer drop shadow**
    (alpha 0.35, offset (0.5, -0.5), radius 0.8). `shadowPath` set to the
    markers path for performance. Sells the "applied gold stud" feel.
-3. **Power reserve ticks softened** — strokeColor `numeralBlack` → 
+2. **Power reserve ticks softened** — strokeColor `numeralBlack` → 
    `subDialNumeral` (warmer/lighter), lineWidth `r·0.05 → r·0.030`.
    Minor ticks shortened (r·0.91 → r·0.93 inner) so majors dominate.
+
+## Polish pass D' — corrections from user feedback
+
+I initially misread polished-gold glint on the hands as a hollow-lozenge
+"open blade" — added an inner lozenge subpath. Caleb corrected: the hands
+are SOLID gold (Lange hands are solid; the glint is just reflection on the
+polished surface). Reverted that change.
+
+Also clarified that **Roman numerals are RAISED GOLD EMBOSSINGS**, not
+painted black text. Changed `mainTimeNumeralsLayer.fillColor` from
+`numeralBlack` → `handGold` and added the same drop-shadow technique as
+the hour markers (alpha 0.40, offset (0.6, -0.6), radius 1.0) plus a
+thin `caseGoldShadow` stroke. The Romans now read as applied-gold
+elements matching the markers.
+
+Hand-blade proportions also retuned: lozenge now occupies 40-90% of the
+forward length (was 50-92%) with the peak at the symmetric midpoint of
+the blade — larger, more prominent diamond near the tip.
 
 ## Open follow-ups
 

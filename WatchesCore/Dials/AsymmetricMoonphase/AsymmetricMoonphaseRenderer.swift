@@ -339,8 +339,16 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         mainTimeTicksLayer.strokeColor = AsymmetricMoonphasePalette.numeralBlack
         caseBackgroundLayer.addSublayer(mainTimeTicksLayer)
 
-        mainTimeNumeralsLayer.fillColor = AsymmetricMoonphasePalette.numeralBlack
-        mainTimeNumeralsLayer.strokeColor = nil
+        // Roman numerals as RAISED gold embossings (applied to the dial,
+        // not painted). Drop shadow + thin dark stroke sells the
+        // dimensional applied-gold look.
+        mainTimeNumeralsLayer.fillColor = AsymmetricMoonphasePalette.handGold
+        mainTimeNumeralsLayer.strokeColor = AsymmetricMoonphasePalette.caseGoldShadow
+        mainTimeNumeralsLayer.lineWidth = 0.4
+        mainTimeNumeralsLayer.shadowColor = NSColor.black.cgColor
+        mainTimeNumeralsLayer.shadowOpacity = 0.40
+        mainTimeNumeralsLayer.shadowOffset = CGSize(width: 0.6, height: -0.6)
+        mainTimeNumeralsLayer.shadowRadius = 1.0
         caseBackgroundLayer.addSublayer(mainTimeNumeralsLayer)
 
         mainTimeHourMarkersLayer.fillColor = AsymmetricMoonphasePalette.handGold
@@ -735,6 +743,7 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         }
         mainTimeNumeralsLayer.frame = CGRect(origin: .zero, size: canvas)
         mainTimeNumeralsLayer.path = romansPath
+        mainTimeNumeralsLayer.shadowPath = romansPath
 
         // Hands — anchor at the PIVOT (tail extends behind in layer bounds).
         let tailFrac = Self.handTailFraction
@@ -1405,15 +1414,12 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
         return path.isEmpty ? nil : path
     }
 
-    /// Lange-1 lance hand path. `width` is the diamond's peak width, `length`
-    /// is forward-from-pivot reach. The path also includes a counterweight
-    /// tail of `tailFraction × length` extending behind the pivot, a HOLLOW
-    /// lozenge near the tip (Lange's iconic open-blade signature), and
-    /// optionally a circular hole/ring near the pivot (minute-hand signature).
-    /// Anchor is at the PIVOT (not the bottom of the path). Callers must set
-    /// `layer.anchorPoint.y = tailFraction / (1 + tailFraction)` AND
-    /// `fillRule = .evenOdd` on the host layer so the inner subpaths render
-    /// as holes.
+    /// Lange-1 lance hand path. SOLID gold blade with a symmetric lozenge
+    /// near the tip. `width` is the diamond's peak width, `length` is
+    /// forward-from-pivot reach. Includes a counterweight tail of
+    /// `tailFraction × length` extending behind the pivot, and optionally a
+    /// circular pivot eye (minute-hand signature; renders as a hole with
+    /// `.evenOdd` fill rule on the host layer).
     private func goldHandPath(
         width: CGFloat,
         length: CGFloat,
@@ -1427,12 +1433,13 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
             let shaftW = width * 0.16            // slim shaft
             let tailW = width * 0.52             // small lozenge at the tail end
             let diamondW = width                 // peak blade width = input width
-            let diamondStartY = tailL + length * 0.50
-            let diamondPeakY = tailL + length * 0.74
-            let tipNarrowY = tailL + length * 0.92
+            // Larger lozenge (40-90% of forward length) with peak at the
+            // midpoint — symmetric blade, matching the Lange 1 reference.
+            let diamondStartY = tailL + length * 0.40
+            let diamondPeakY = tailL + length * 0.65
+            let tipNarrowY = tailL + length * 0.90
             let tipY = tailL + length
 
-            // Tail tip at the bottom of the path (outer blade silhouette).
             path.move(to: CGPoint(x: cx, y: 0))
             path.addLine(to: CGPoint(x: cx + tailW / 2, y: tailL * 0.55))
             path.addLine(to: CGPoint(x: cx + shaftW / 2, y: tailL))
@@ -1447,22 +1454,9 @@ public final class AsymmetricMoonphaseRenderer: DialRenderer {
             path.addLine(to: CGPoint(x: cx - tailW / 2, y: tailL * 0.55))
             path.closeSubpath()
 
-            // Hollow lozenge near the tip — Lange's iconic "open" blade.
-            // Inset relative to the outer diamond so a gold frame remains
-            // around the hole.
-            let bladeCenterY = (diamondStartY + tipNarrowY) / 2
-            let innerHalfHeight = (tipNarrowY - diamondStartY) * 0.40
-            let innerHalfWidth = diamondW * 0.30
-            path.move(to: CGPoint(x: cx, y: bladeCenterY + innerHalfHeight))
-            path.addLine(to: CGPoint(x: cx + innerHalfWidth, y: bladeCenterY))
-            path.addLine(to: CGPoint(x: cx, y: bladeCenterY - innerHalfHeight))
-            path.addLine(to: CGPoint(x: cx - innerHalfWidth, y: bladeCenterY))
-            path.closeSubpath()
-
             if withHole {
-                // Circular eye near the pivot — minute-hand signature. A
-                // separate (non-nested) subpath, so with .evenOdd it also
-                // renders as a hole alongside the blade lozenge.
+                // Circular eye near the pivot — minute-hand signature.
+                // With .evenOdd fill rule on the layer, this renders as a hole.
                 let holeR = shaftW * 1.6
                 let holeY = tailL + holeR * 1.4
                 path.addEllipse(in: CGRect(
