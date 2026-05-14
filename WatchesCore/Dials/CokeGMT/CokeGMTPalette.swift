@@ -18,8 +18,10 @@ public enum CokeGMTPalette {
         srgbRed: 0.96, green: 0.96, blue: 0.97, alpha: 1.0
     ).cgColor
 
+    /// Pass-2: darkened from (0.42, 0.43, 0.46) for deeper lower-right
+    /// shadow on the case top — Pass-1 read too uniform across the disc.
     public static let caseSteelShadow: CGColor = NSColor(
-        srgbRed: 0.42, green: 0.43, blue: 0.46, alpha: 1.0
+        srgbRed: 0.34, green: 0.35, blue: 0.38, alpha: 1.0
     ).cgColor
 
     // MARK: Bezel — bicolor ceramic

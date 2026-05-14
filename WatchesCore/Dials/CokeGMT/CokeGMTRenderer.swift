@@ -60,6 +60,7 @@ public final class CokeGMTRenderer: DialRenderer {
     private let bezelRedHalf = CAShapeLayer()
     private let bezelRedGradient = CAGradientLayer()
     private let bezelCeramicSheen = CAShapeLayer()
+    private let bezelMidArcSheen = CAShapeLayer()    // Pass-2 Element 22 — curved-surface highlight
     private let bezelInnerGroove = CAShapeLayer()
     private let bezelNumeralsLayer = CAShapeLayer()
     private let bezelTicksLayer = CAShapeLayer()
@@ -93,6 +94,7 @@ public final class CokeGMTRenderer: DialRenderer {
     private let gmtHandLayer = CAShapeLayer()
     private let secondsHandLayer = CAShapeLayer()
     private let secondsPommelLayer = CAShapeLayer()
+    private let secondsTipLumeDot = CAShapeLayer()    // Pass-2: mandatory tip dot
     private let centerHubLayer = CAShapeLayer()
 
     // MARK: Anchors
@@ -117,6 +119,18 @@ public final class CokeGMTRenderer: DialRenderer {
 
         installLayers()
         layoutLayers(for: canvas)
+
+        // Pass-2 fix: seed lastRenderedDay from a one-time `Date()` read so
+        // the date window shows today's date on the very first frame
+        // (rather than the "1" placeholder that clamps from `day = 0`).
+        // This is install-time only and NOT a P4 violation — the per-frame
+        // loop is still purely time-driven via tick(reduceMotion:); we
+        // just want the initial visible state to match what the first
+        // tick would produce anyway.
+        let initialDay = localCalendar.component(.day, from: Date())
+        updateDateDigit(day: initialDay)
+        lastRenderedDay = initialDay
+
         _ = tick(reduceMotion: false)
 
         Logging.renderer.info(
@@ -250,6 +264,15 @@ public final class CokeGMTRenderer: DialRenderer {
         bezelCeramicSheen.strokeColor = CokeGMTPalette.ceramicSheenWhite
         bezelCeramicSheen.lineCap = .round
         canvasBackground.addSublayer(bezelCeramicSheen)
+
+        // Pass-2 Element 22: mid-arc directional sheen at the bezel
+        // centerline. Stacks with the top-edge band + radial bloom to
+        // give the ceramic its "rounded surface lit from upper-left"
+        // reading.
+        bezelMidArcSheen.fillColor = nil
+        bezelMidArcSheen.strokeColor = NSColor(white: 1.0, alpha: 0.18).cgColor
+        bezelMidArcSheen.lineCap = .round
+        canvasBackground.addSublayer(bezelMidArcSheen)
 
         bezelInnerGroove.fillColor = nil
         bezelInnerGroove.strokeColor = NSColor(white: 0.0, alpha: 0.60).cgColor
@@ -424,6 +447,12 @@ public final class CokeGMTRenderer: DialRenderer {
         secondsHandLayer.shadowRadius = 1.6
         canvasBackground.addSublayer(secondsHandLayer)
 
+        // Pass-2: seconds tip lume dot — child of the seconds hand so it
+        // rotates with the needle. Promoted from optional to mandatory.
+        secondsTipLumeDot.fillColor = CokeGMTPalette.lumeCream
+        secondsTipLumeDot.strokeColor = CokeGMTPalette.lumeCreamOutline
+        secondsHandLayer.addSublayer(secondsTipLumeDot)
+
         centerHubLayer.fillColor = CokeGMTPalette.gmtHandGold
         centerHubLayer.strokeColor = CokeGMTPalette.goldOutline
         centerHubLayer.lineWidth = 0.4
@@ -496,11 +525,15 @@ public final class CokeGMTRenderer: DialRenderer {
         brushMask.fillColor = NSColor.white.cgColor
         caseBrushLayer.mask = brushMask
 
-        // Bezel halves — paths in canvas coords. Gradient layers cover the
-        // full canvas and use the half-shapes as masks.
+        // Bezel halves — Pass-2 corrected angle convention.
+        // Black covers the UPPER semicircle (over the top), red covers the
+        // LOWER semicircle. CA y-up: +π/2 = 12 o'clock, 0 = 3 o'clock,
+        // π = 9 o'clock, -π/2 = 6 o'clock. Black goes CCW from 3 → 12 →
+        // 9; red goes CW from 3 → 6 → 9. Same start/end angles, just
+        // different `clockwise`.
         let blackHalfPath = bezelHalfPath(
             center: caseCenter, outerR: bezelOuterR, innerR: bezelInnerR,
-            startAngle: -.pi / 2, endAngle: .pi / 2, clockwise: false
+            startAngle: 0, endAngle: .pi, clockwise: false
         )
         bezelBlackGradient.frame = CGRect(origin: .zero, size: canvas)
         bezelBlackHalf.frame = bezelBlackGradient.bounds
@@ -508,7 +541,7 @@ public final class CokeGMTRenderer: DialRenderer {
 
         let redHalfPath = bezelHalfPath(
             center: caseCenter, outerR: bezelOuterR, innerR: bezelInnerR,
-            startAngle: .pi / 2, endAngle: -.pi / 2, clockwise: false
+            startAngle: 0, endAngle: .pi, clockwise: true
         )
         bezelRedGradient.frame = CGRect(origin: .zero, size: canvas)
         bezelRedHalf.frame = bezelRedGradient.bounds
@@ -525,6 +558,20 @@ public final class CokeGMTRenderer: DialRenderer {
         )
         bezelCeramicSheen.path = sheenPath
         bezelCeramicSheen.lineWidth = max(1.0, caseRadius * 0.014)
+
+        // Element 22 — mid-arc directional sheen on the bezel centerline.
+        // Sweep from 100° to 170° (upper-left curve of the bezel).
+        let midArcR = (bezelOuterR + bezelInnerR) / 2
+        let midArcPath = CGMutablePath()
+        midArcPath.addArc(
+            center: caseCenter, radius: midArcR,
+            startAngle: 100.0 * .pi / 180.0,
+            endAngle: 170.0 * .pi / 180.0,
+            clockwise: false
+        )
+        bezelMidArcSheen.frame = CGRect(origin: .zero, size: canvas)
+        bezelMidArcSheen.path = midArcPath
+        bezelMidArcSheen.lineWidth = max(1.5, caseRadius * 0.040)
 
         // Bezel inner groove at bezelInnerR.
         bezelInnerGroove.frame = CGRect(origin: .zero, size: canvas)
@@ -706,9 +753,10 @@ public final class CokeGMTRenderer: DialRenderer {
         markerDotsLayer.lineWidth = max(0.5, dialRadius * 0.003)
 
         // Bars at 6 and 9 — rounded rectangles radially aligned.
+        // Pass-2: width 0.045 → 0.055 for more presence against the dots.
         let barOuterR = dialRadius * 0.86
         let barInnerR = dialRadius * 0.66
-        let barWidth = dialRadius * 0.045
+        let barWidth = dialRadius * 0.055
         let barsPath = CGMutablePath()
         for h in [6, 9] {
             let angle = .pi / 2 - CGFloat(h) / 12.0 * 2 * .pi
@@ -809,7 +857,7 @@ public final class CokeGMTRenderer: DialRenderer {
         minuteHandLayer.shadowPath = minutePath
 
         let gmtLength = dialRadius * 0.94
-        let gmtWidth = dialRadius * 0.022
+        let gmtWidth = dialRadius * 0.028   // Pass-2: 0.022 → 0.028 (~27% wider shaft for readability)
         let gmtPath = gmtHandPath(width: gmtWidth, length: gmtLength)
         let gmtBounds = CGRect(x: 0, y: 0, width: gmtWidth, height: gmtLength)
         gmtHandLayer.bounds = gmtBounds
@@ -844,6 +892,21 @@ public final class CokeGMTRenderer: DialRenderer {
         )
         secondsPommelLayer.path = pommelPath
 
+        // Pass-2: seconds tip lume dot — positioned in seconds-hand-local
+        // coords at 78% along the forward needle (measured from pivot).
+        let secondsDotR = dialRadius * 0.014
+        let dotCenterYLocal = secondsTail + secondsFwd * 0.78
+        secondsTipLumeDot.frame = CGRect(
+            x: secondsBounds.midX - secondsDotR,
+            y: dotCenterYLocal - secondsDotR,
+            width: secondsDotR * 2, height: secondsDotR * 2
+        )
+        secondsTipLumeDot.path = CGPath(
+            ellipseIn: CGRect(origin: .zero, size: secondsTipLumeDot.bounds.size),
+            transform: nil
+        )
+        secondsTipLumeDot.lineWidth = max(0.3, dialRadius * 0.002)
+
         // Center hub.
         let hubR = dialRadius * 0.030
         let hubPath = CGPath(
@@ -856,6 +919,9 @@ public final class CokeGMTRenderer: DialRenderer {
         )
         centerHubLayer.path = hubPath
         centerHubLayer.shadowPath = hubPath
+
+        // Pass-2: wire specular highlights once paths are set.
+        applyAllSpecularHighlights()
     }
 
     private func updateDateDigit(day: Int) {
@@ -876,15 +942,17 @@ public final class CokeGMTRenderer: DialRenderer {
 
     /// Snowflake hour/minute hand path — 16 vertices per design spec.
     /// `isMinute = true` uses the elongated/slimmer proportions.
+    /// Pass-2: lozenge moved outward (hour 0.60-0.90, minute 0.74-0.93),
+    /// tip cap shortened to 7%/5% of length.
     private func snowflakeHandPath(width: CGFloat, length: CGFloat, isMinute: Bool) -> CGPath {
         let path = CGMutablePath()
         let cx = width / 2
         let shaftWidth: CGFloat = isMinute ? width * 0.14 : width * 0.18
-        let lozengeStartY: CGFloat = isMinute ? length * 0.62 : length * 0.45
-        let lozengeEndY: CGFloat = isMinute ? length * 0.86 : length * 0.85
+        let lozengeStartY: CGFloat = isMinute ? length * 0.74 : length * 0.60
+        let lozengeEndY: CGFloat = isMinute ? length * 0.93 : length * 0.90
         let lozengeHalfWidth = width * 0.50
         let lozengeChamfer = width * 0.10
-        let tipBaseY: CGFloat = isMinute ? length * 0.90 : length * 0.88
+        let tipBaseY: CGFloat = isMinute ? length * 0.95 : length * 0.93
         let tipBaseHalfWidth: CGFloat = isMinute ? width * 0.16 : width * 0.18
         let tipY = length
 
@@ -909,12 +977,14 @@ public final class CokeGMTRenderer: DialRenderer {
 
     /// GMT hand path — shaft + plain triangle arrowhead (v1; chevron-notch
     /// refinement deferred per spec).
+    /// Pass-2: arrowhead multiplier 2.4 → 3.0 for readability against the
+    /// busy dial. Width parameter is also wider (0.022 → 0.028 at call site).
     private func gmtHandPath(width: CGFloat, length: CGFloat) -> CGPath {
         let path = CGMutablePath()
         let cx = width / 2
         let arrowBaseY = length * 0.84
         let arrowMidY = length * 0.92
-        let arrowHalfWidth = width * 2.4
+        let arrowHalfWidth = width * 3.0
         let tipY = length
 
         path.move(to: CGPoint(x: cx + width / 2, y: 0))
@@ -984,6 +1054,93 @@ public final class CokeGMTRenderer: DialRenderer {
                     clockwise: !clockwise)
         path.closeSubpath()
         return path
+    }
+
+    // MARK: - Specular highlights (Pass-2 — REQUIRED per spec Elements 19, 20)
+
+    /// Adds (or refreshes) a `CAGradientLayer` providing a diagonal gold
+    /// specular sweep across the host element. Carry-over of the helper
+    /// pattern from Asymmetric Moonphase's renderer. Idempotent — removes
+    /// any prior specular sublayer before re-adding so it survives
+    /// repeated `layoutLayers` calls.
+    ///
+    /// `useLocalPath: true` for layers whose path is in layer-local coords
+    /// (rotating hands, hub layers with offset frames). `false` for layers
+    /// whose path is in canvas coords (markers, date frame).
+    private func applyGoldSpecular(to host: CAShapeLayer, useLocalPath: Bool) {
+        applySpecularHighlight(
+            to: host,
+            useLocalPath: useLocalPath,
+            stops: [
+                CokeGMTPalette.goldSpecularHi,
+                CokeGMTPalette.goldSpecularMid,
+                NSColor(white: 1.0, alpha: 0.0).cgColor,
+                CokeGMTPalette.goldSpecularLo,
+            ],
+            locations: [0.00, 0.30, 0.55, 1.00]
+        )
+    }
+
+    /// Cream-lume specular variant — softer/less saturated than gold.
+    private func applyLumeSpecular(to host: CAShapeLayer, useLocalPath: Bool) {
+        applySpecularHighlight(
+            to: host,
+            useLocalPath: useLocalPath,
+            stops: [
+                CokeGMTPalette.lumeSpecularHi,
+                CokeGMTPalette.lumeSpecularMid,
+                NSColor(white: 1.0, alpha: 0.0).cgColor,
+                CokeGMTPalette.lumeSpecularLo,
+            ],
+            locations: [0.00, 0.40, 0.65, 1.00]
+        )
+    }
+
+    private func applySpecularHighlight(
+        to host: CAShapeLayer,
+        useLocalPath: Bool,
+        stops: [CGColor],
+        locations: [NSNumber]
+    ) {
+        host.sublayers?.removeAll(where: { $0.name == "cokeGMT.specular" })
+        guard let basePath = host.path else { return }
+        let bounds = basePath.boundingBox
+        let gradient = CAGradientLayer()
+        gradient.name = "cokeGMT.specular"
+        gradient.frame = useLocalPath ? host.bounds : bounds
+        gradient.type = .axial
+        gradient.startPoint = CGPoint(x: 0.0, y: 1.0)
+        gradient.endPoint = CGPoint(x: 1.0, y: 0.0)
+        gradient.colors = stops
+        gradient.locations = locations
+        let mask = CAShapeLayer()
+        mask.frame = CGRect(origin: .zero, size: gradient.bounds.size)
+        mask.fillColor = NSColor.white.cgColor
+        if useLocalPath {
+            mask.path = basePath
+        } else {
+            var t = CGAffineTransform(translationX: -bounds.minX, y: -bounds.minY)
+            mask.path = basePath.copy(using: &t)
+        }
+        gradient.mask = mask
+        host.addSublayer(gradient)
+    }
+
+    /// Apply specular gradients to every required element per Pass-2 spec.
+    /// Called at the end of `layoutLayers` so every host has its path set.
+    private func applyAllSpecularHighlights() {
+        // Lume family — softer cream highlight (Element 20).
+        applyLumeSpecular(to: hourHandLayer, useLocalPath: true)
+        applyLumeSpecular(to: minuteHandLayer, useLocalPath: true)
+        applyLumeSpecular(to: markerDotsLayer, useLocalPath: false)
+        applyLumeSpecular(to: markerBarsLayer, useLocalPath: false)
+        applyLumeSpecular(to: markerTriangle12Layer, useLocalPath: false)
+        applyLumeSpecular(to: bezelPipLayer, useLocalPath: false)
+        // Gold family — saturated yellow-gold highlight (Element 19).
+        applyGoldSpecular(to: gmtHandLayer, useLocalPath: true)
+        applyGoldSpecular(to: secondsHandLayer, useLocalPath: true)
+        applyGoldSpecular(to: centerHubLayer, useLocalPath: true)
+        applyGoldSpecular(to: dateFrameLayer, useLocalPath: false)
     }
 
     // MARK: - Procedural textures

@@ -181,6 +181,71 @@ Diver) are execution rather than architecture.
   `makeFaceStippleImage()` with a parameterized version that handles
   both the dial grain (1×1 dots) and brushed steel (6×1 dots).
 
+## Polish Pass 2 (Story 2.1.1, 2026-05-14)
+
+After Caleb reviewed the first-pass render he flagged three explicit
+issues + asked for a full designer-agent re-pass against the canonical
+Tudor reference. The designer revised `design-spec.md` in place with
+Pass-2 markers. This implementation applies that diff.
+
+**Three explicit fixes:**
+
+1. **Bezel rotation (the bug).** The original spec used the wrong
+   coordinate convention (called `-π/2` "3 o'clock" — actually 6
+   o'clock in CA y-up). Both `bezelHalfPath` calls now use
+   `startAngle: 0, endAngle: π`; black passes `clockwise: false` (CCW
+   over the top), red passes `clockwise: true` (CW under the bottom).
+   Result: black covers 18→24→6 across the top, red covers 6→12→18
+   across the bottom — matching the canonical Coke colorway.
+2. **Date placeholder.** `attach()` now reads today's day-of-month
+   from `Date()` once at install time and seeds `lastRenderedDay`
+   before the first `tick()`. Replaces the Pass-1 "shows 1 briefly"
+   placeholder. Not a P4 violation — the per-frame loop is still
+   purely time-driven; we just want the initial visible state to
+   match what the first tick produces anyway.
+3. **Snowflake position.** Lozenge moved outward, tip cap shortened:
+   - Hour: lozenge `0.45-0.85` → `0.60-0.90`; cap `0.88-1.00` → `0.93-1.00` (7% cap).
+   - Minute: lozenge `0.62-0.86` → `0.74-0.93`; cap `0.90-1.00` → `0.95-1.00` (5% cap).
+
+**Five photorealism upgrades:**
+
+1. **Element 22 — mid-arc directional bezel sheen.** New
+   `bezelMidArcSheen` layer: a stroked arc at the bezel centerline
+   (radius `caseRadius * 0.935`) sweeping 100°→170° with `lineWidth =
+   caseRadius * 0.040` at alpha 0.18. Combined with the radial bloom
+   (Element 21) and the top-edge band (Element 2), this gives the
+   ceramic the "rounded surface lit from upper-left" reading that the
+   Pass-1 snapshot lacked.
+2. **GMT hand widened.** Shaft `0.022 → 0.028` (~27% wider). Arrowhead
+   multiplier `2.4 → 3.0` (~60% more area). The Pass-1 hand was barely
+   readable; Pass-2 reads clearly without dominating the dial.
+3. **Specular highlights wired (Elements 19 + 20).** Both helpers were
+   specced in v1 but NOT implemented. Pass-2 implements `applyGoldSpecular`
+   (saturated yellow-gold sweep) and `applyLumeSpecular` (softer cream
+   sweep) as renderer-private methods sharing a generic
+   `applySpecularHighlight` core. The factory call
+   `applyAllSpecularHighlights()` is invoked at the end of
+   `layoutLayers` to apply specular to:
+   - **Gold family** (saturated): GMT hand, seconds hand, center hub,
+     date frame.
+   - **Lume family** (soft): hour snowflake, minute snowflake, marker
+     dots, marker bars, 12 triangle, bezel pip.
+   Rotating hosts use `useLocalPath: true` so the specular rotates
+   with the element; non-rotating hosts use `useLocalPath: false` with
+   a translated mask path.
+4. **Seconds tip lume dot promoted to mandatory.** New
+   `secondsTipLumeDot` layer — a small filled circle (radius
+   `dialRadius * 0.014`) at 78% along the needle from the pivot.
+   Added as a SUBLAYER of `secondsHandLayer` so it rotates with the
+   needle.
+5. **Case + bar tuning.** `caseSteelShadow` darkened
+   `(0.42, 0.43, 0.46) → (0.34, 0.35, 0.38)` for a deeper lower-right
+   shadow on the case. Marker bars at 6/9 widened
+   `dialRadius * 0.045 → 0.055` for more presence against the dots.
+
+86 tests still pass. No protocol amendments, no ADRs. The picker's
+preview thumbnail was regenerated via DialSnapshot post-implementation.
+
 ## Open follow-ups (deferred to Story 2.1.1 or later)
 
 - **Chevron-notched GMT arrowhead.** Spec Element 11 offers a chevron
