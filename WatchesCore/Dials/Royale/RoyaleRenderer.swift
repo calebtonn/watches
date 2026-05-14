@@ -152,6 +152,13 @@ public final class RoyaleRenderer: DialRenderer {
     /// Thin border rects around the two secondary data fields (day + date).
     private var secondaryBoxLayers: [CAShapeLayer] = []
 
+    /// Two-line time-zone label in the top-right cutout. Line 1 = localized
+    /// time-zone name (e.g., `CENTRAL DAYLIGHT TIME`); line 2 = city, state
+    /// + country derived from `TimeZone.current.identifier`. Rendered as
+    /// pixel-block letters via `LetterSlot` to match the LCD aesthetic.
+    private var tzNameLetterSlots: [LetterSlot] = []
+    private var tzCityLetterSlots: [LetterSlot] = []
+
     /// Last integer-second rendered. Used for both reduce-motion dedup and
     /// 1 Hz colon blink parity.
     private var lastRenderedSecond: Int?
@@ -298,6 +305,8 @@ public final class RoyaleRenderer: DialRenderer {
         screwLayers.removeAll()
         pusherLayers.removeAll()
         secondaryBoxLayers.removeAll()
+        tzNameLetterSlots.removeAll()
+        tzCityLetterSlots.removeAll()
         subdialNumberLayers.removeAll()
         subdialRivetLayers.removeAll()
         cutoutGeometry = nil
@@ -901,6 +910,9 @@ public final class RoyaleRenderer: DialRenderer {
         // Reset rotation cache so the next tick re-renders the seconds tick.
         lastRenderedSecondTickIndex = nil
 
+        // Top-right cutout — time-zone name + city/state/country label.
+        rebuildTimeZoneLabel(cutout: toLCD(cutouts.topRight))
+
         // Map — fills the middle-right cutout area. Two procedural CAShapeLayers
         // (light base + dark zone highlight) sit on top of mapLayer.
         let mapFrameLCD = toLCD(cutouts.middleRight)
@@ -1247,6 +1259,176 @@ public final class RoyaleRenderer: DialRenderer {
             caseBackgroundLayer.addSublayer(layer)
             subdialRivetLayers.append(layer)
         }
+    }
+
+    // MARK: - Top-right cutout: timezone name + city label
+
+    /// Lookup table mapping IANA time-zone identifiers to a human-readable
+    /// `CITY, STATE COUNTRY` string. Falls back to parsing the IANA
+    /// identifier + Locale region name for zones not listed here.
+    /// Coverage: major US/CA/MX/Europe/Asia/Oceania zones. Not exhaustive.
+    private static let cityLookup: [String: String] = [
+        // US
+        "America/New_York":     "New York, NY United States",
+        "America/Detroit":      "Detroit, MI United States",
+        "America/Indianapolis": "Indianapolis, IN United States",
+        "America/Indiana/Indianapolis": "Indianapolis, IN United States",
+        "America/Chicago":      "Chicago, IL United States",
+        "America/Denver":       "Denver, CO United States",
+        "America/Phoenix":      "Phoenix, AZ United States",
+        "America/Los_Angeles":  "Los Angeles, CA United States",
+        "America/Anchorage":    "Anchorage, AK United States",
+        "Pacific/Honolulu":     "Honolulu, HI United States",
+        // Canada
+        "America/Toronto":      "Toronto, ON Canada",
+        "America/Vancouver":    "Vancouver, BC Canada",
+        "America/Montreal":     "Montreal, QC Canada",
+        "America/Halifax":      "Halifax, NS Canada",
+        "America/St_Johns":     "St Johns, NL Canada",
+        "America/Winnipeg":     "Winnipeg, MB Canada",
+        // Mexico + Latin America
+        "America/Mexico_City":  "Mexico City, Mexico",
+        "America/Sao_Paulo":    "Sao Paulo, Brazil",
+        "America/Buenos_Aires": "Buenos Aires, Argentina",
+        "America/Argentina/Buenos_Aires": "Buenos Aires, Argentina",
+        "America/Lima":         "Lima, Peru",
+        "America/Bogota":       "Bogota, Colombia",
+        "America/Santiago":     "Santiago, Chile",
+        // Europe
+        "Europe/London":        "London, England United Kingdom",
+        "Europe/Paris":         "Paris, France",
+        "Europe/Berlin":        "Berlin, Germany",
+        "Europe/Madrid":        "Madrid, Spain",
+        "Europe/Rome":          "Rome, Italy",
+        "Europe/Amsterdam":     "Amsterdam, Netherlands",
+        "Europe/Brussels":      "Brussels, Belgium",
+        "Europe/Vienna":        "Vienna, Austria",
+        "Europe/Zurich":        "Zurich, Switzerland",
+        "Europe/Stockholm":     "Stockholm, Sweden",
+        "Europe/Oslo":          "Oslo, Norway",
+        "Europe/Copenhagen":    "Copenhagen, Denmark",
+        "Europe/Helsinki":      "Helsinki, Finland",
+        "Europe/Warsaw":        "Warsaw, Poland",
+        "Europe/Athens":        "Athens, Greece",
+        "Europe/Istanbul":      "Istanbul, Turkey",
+        "Europe/Moscow":        "Moscow, Russia",
+        "Europe/Lisbon":        "Lisbon, Portugal",
+        "Europe/Dublin":        "Dublin, Ireland",
+        // Asia
+        "Asia/Tokyo":           "Tokyo, Japan",
+        "Asia/Seoul":           "Seoul, South Korea",
+        "Asia/Shanghai":        "Shanghai, China",
+        "Asia/Hong_Kong":       "Hong Kong",
+        "Asia/Taipei":          "Taipei, Taiwan",
+        "Asia/Singapore":       "Singapore",
+        "Asia/Bangkok":         "Bangkok, Thailand",
+        "Asia/Jakarta":         "Jakarta, Indonesia",
+        "Asia/Manila":          "Manila, Philippines",
+        "Asia/Kuala_Lumpur":    "Kuala Lumpur, Malaysia",
+        "Asia/Kolkata":         "Mumbai, India",
+        "Asia/Calcutta":        "Mumbai, India",
+        "Asia/Karachi":         "Karachi, Pakistan",
+        "Asia/Dubai":           "Dubai, UAE",
+        "Asia/Riyadh":          "Riyadh, Saudi Arabia",
+        "Asia/Jerusalem":       "Jerusalem, Israel",
+        "Asia/Tehran":          "Tehran, Iran",
+        // Africa
+        "Africa/Lagos":         "Lagos, Nigeria",
+        "Africa/Cairo":         "Cairo, Egypt",
+        "Africa/Johannesburg":  "Johannesburg, South Africa",
+        "Africa/Nairobi":       "Nairobi, Kenya",
+        "Africa/Casablanca":    "Casablanca, Morocco",
+        // Oceania
+        "Australia/Sydney":     "Sydney, NSW Australia",
+        "Australia/Melbourne":  "Melbourne, VIC Australia",
+        "Australia/Brisbane":   "Brisbane, QLD Australia",
+        "Australia/Perth":      "Perth, WA Australia",
+        "Australia/Adelaide":   "Adelaide, SA Australia",
+        "Pacific/Auckland":     "Auckland, New Zealand",
+    ]
+
+    /// Returns the localized time-zone name, uppercased and diacritic-stripped
+    /// to match the pixel-block alphabet's coverage. Uses the appropriate
+    /// daylight/standard variant based on current DST state.
+    private static func currentTimeZoneName() -> String {
+        let tz = TimeZone.current
+        let style: NSTimeZone.NameStyle = tz.isDaylightSavingTime() ? .daylightSaving : .standard
+        let name = tz.localizedName(for: style, locale: .current) ?? tz.identifier
+        return name
+            .folding(options: .diacriticInsensitive, locale: nil)
+            .uppercased()
+    }
+
+    /// Returns `CITY, STATE COUNTRY` for the current time zone, derived from
+    /// either the curated lookup table or the IANA identifier + Locale region
+    /// name. Uppercased and diacritic-stripped.
+    private static func currentTimeZoneCity() -> String {
+        let tz = TimeZone.current
+        let identifier = tz.identifier
+
+        let raw: String
+        if let table = cityLookup[identifier] {
+            raw = table
+        } else {
+            // Fallback: parse "Region/City" from the IANA identifier and
+            // append the localized country name.
+            let cityRaw = identifier.split(separator: "/").last.map(String.init) ?? identifier
+            let city = cityRaw.replacingOccurrences(of: "_", with: " ")
+            let regionCode = Locale.current.region?.identifier
+            let country = regionCode.flatMap {
+                Locale.current.localizedString(forRegionCode: $0)
+            }
+            if let country, !country.isEmpty {
+                raw = "\(city), \(country)"
+            } else {
+                raw = city
+            }
+        }
+
+        return raw
+            .folding(options: .diacriticInsensitive, locale: nil)
+            .uppercased()
+    }
+
+    /// Renders the two-line timezone label inside the top-right cutout.
+    /// Cell width is computed to fit the longer of the two lines; both lines
+    /// share the same cell size so they read as a consistent block.
+    private func rebuildTimeZoneLabel(cutout: CGRect) {
+        for slot in tzNameLetterSlots { slot.removeFromParent() }
+        for slot in tzCityLetterSlots { slot.removeFromParent() }
+        tzNameLetterSlots = []
+        tzCityLetterSlots = []
+
+        let line1 = Self.currentTimeZoneName()
+        let line2 = Self.currentTimeZoneCity()
+
+        let maxLen = max(line1.count, line2.count, 1)
+        let hInset = cutout.width * 0.03
+        let availableWidth = cutout.width - hInset * 2
+        let letterAdvance = availableWidth / CGFloat(maxLen)
+        let letterWidth = letterAdvance * 0.92  // 8% gap between letters
+
+        let vInset = cutout.height * 0.08
+        let lineGap = cutout.height * 0.10
+        let lineHeight = (cutout.height - vInset * 2 - lineGap) / 2
+        // y=0 is bottom of cutout; row 1 (top) sits above row 2 (bottom).
+        let line2Y = cutout.minY + vInset
+        let line1Y = line2Y + lineHeight + lineGap
+
+        func renderLine(
+            _ text: String, y: CGFloat, into slots: inout [LetterSlot]
+        ) {
+            for (i, char) in text.enumerated() {
+                let x = cutout.minX + hInset + CGFloat(i) * letterAdvance
+                let frame = CGRect(x: x, y: y, width: letterWidth, height: lineHeight)
+                let slot = LetterSlot(parent: lcdLayer, frame: frame)
+                slot.set(letter: char)
+                slots.append(slot)
+            }
+        }
+
+        renderLine(line1, y: line1Y, into: &tzNameLetterSlots)
+        renderLine(line2, y: line2Y, into: &tzCityLetterSlots)
     }
 
     // MARK: - Procedural world map (Story 1.5.1 amendment)
