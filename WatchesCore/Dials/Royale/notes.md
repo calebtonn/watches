@@ -55,25 +55,42 @@ Inspired by the Casio AE-1200WH.
 
 **Deferred.** Locale-dependent date-format ordering. Tracked in `deferred-work.md`.
 
-### D7: World-time map — bitmap asset (Story 1.5.1 landed)
+### D7: World-time map — high-resolution procedural with time-zone highlight (Story 1.5.1 revised)
 
-**Decision.** Story 1.5 shipped a procedural 36×14 dot-pattern via `RoyaleRenderer.continentsPath(size:)` as a placeholder. Story 1.5.1 replaced this with a real PNG bitmap (`RoyaleMap.png`) bundled inside `WatchesCore.framework`, rendered via `mapLayer.contents = CGImage`. The procedural code was deleted.
+**Decision.** Story 1.5 shipped a procedural 36×14 dot-pattern as a placeholder. Story 1.5.1 first attempted to replace this with a PNG bitmap (`RoyaleMap.png`) bundled inside WatchesCore.framework — that approach worked architecturally but was reverted when the map needed a runtime-computed time-zone highlight (the user's current zone shown as darker dots). The final implementation is **procedural rendering of a 96×32 hand-authored continent silhouette grid** with **two color layers** — a light-gray base for most dots and a dark overlay for the dots inside the user's current time-zone column band.
 
-**Why.** Two reasons: (a) the bitmap can be hand-tuned for higher fidelity than source-code-bound dot grids without recompilation, and (b) Story 1.5.1 established the bundle-resource-loading pattern (`Bundle(for: RoyaleRenderer.self)`) that future dials with bitmap assets will reuse.
+**Why procedural over PNG.** The two-tone time-zone highlight depends on `TimeZone.current.secondsFromGMT()`, which is a runtime input. A static PNG can't express it without either two bitmaps (light + dark zone masks) or a CAShapeLayer overlay that would need to know the grid coordinates anyway. Going fully procedural keeps the grid as a single source of truth.
 
-**Implementation.** The PNG is 432×168 with circular dots (6×6 pixel cells, ~5px dot diameter). Authored programmatically via `Tools/DialSnapshot/main.swift --generate-royale-map`. The renderer uses `mapLayer.contentsGravity = .resize` + `magnificationFilter = .linear` to smoothly scale the dots up to the display cutout size.
+**Grid.** 96 cols × 32 rows. Atlantic-centered: col 0 = ~180°W, col 48 ≈ Greenwich, col 95 = ~180°E. Hand-traced silhouettes for recognizability — Alaska + Canada wide + Greenland separate + Florida hint + Mexico narrow + Brazil bulge + Argentine tail; British Isles + Scandinavia + Italy peninsula + Russia spanning wide; Africa with W-Africa bulge + Cape tip + Madagascar dots; India peninsula + Japan offset + Indonesia archipelago + distinct Australia + Tasmania.
 
-**Deferred.** Day/night terminator math (TBD).
+**Time-zone highlight math.** Each hour zone spans 15° longitude = 96/24 = 4 columns. The user's zone-center column = 48 + `TimeZone.current.secondsFromGMT()`/3600 × 4. Range = [center − 2, center + 2). Dots in that column range fill with `RoyalePalette.mapDotZone` (dark); all other dots fill with `RoyalePalette.mapDotBase` (light gray). The result: the user's region of the map pops visually against the rest.
 
-### D9: Bundle-resource lookup pattern (Story 1.5.1)
+**Note on DST.** `secondsFromGMT()` returns the CURRENT clock offset, so during DST the highlight shifts one column east. For now this is accepted (the visual is approximate; the user can read it as "the band of the world where it's roughly the same time as me"). If geographic-not-clock alignment is desired, subtract `daylightSavingTimeOffset()`.
 
-**Decision.** Per-dial binary assets (PNG bitmaps, future texture maps, etc.) live in `WatchesCore/Dials/<DialName>/` alongside the dial's Swift sources, are bundled into `WatchesCore.framework` automatically via `project.yml`'s sources glob (no explicit `resources:` block needed; the existing `excludes: ["**/*.md"]` keeps notes out of the bundle without affecting PNGs), and are loaded at runtime via `Bundle(for: <DialRenderer>.self).url(forResource:withExtension:)`.
+**Deferred.** Day/night terminator math (still TBD).
+
+### D9: Bundle-resource lookup pattern (originally Story 1.5.1, since obsoleted for Royale)
+
+**Decision.** The bundle-resource pattern (`Bundle(for: <DialRenderer>.self).url(forResource:withExtension:)`) was demonstrated by Story 1.5.1's first attempt at a PNG-bundled map. **Royale no longer uses it** because the map went back to procedural for time-zone-highlight reasons. The pattern remains valid and documented here for future dials that need TRULY static binary assets (preview thumbnails, lunar-phase textures, etc.).
+
+**Reference shape** (kept here for future copy-paste):
+
+```swift
+private static func loadResource(named name: String, ext: String) -> CGImage? {
+    let bundle = Bundle(for: Self.self)
+    guard let url = bundle.url(forResource: name, withExtension: ext),
+          let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+          let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+        Logging.renderer.error("Resource \(name).\(ext) failed to load")
+        return nil
+    }
+    return image
+}
+```
 
 **Why `Bundle(for:)` not `Bundle.main`.** The screensaver host process is `legacyScreenSaver.appex`. `Bundle.main` resolves to *that* process's bundle, not WatchesCore.framework. Using `Bundle(for: <DialRenderer>.self)` walks back from a class defined inside WatchesCore to the framework's bundle, which is the correct resource container.
 
-**Error posture.** Resource-load failures (`url(forResource:...) == nil` or `CGImageSourceCreateImageAtIndex` returning nil) MUST NOT crash. Per P10, the renderer falls back gracefully (e.g., empty content for that region) and logs at `error` level. Pattern is established in `RoyaleRenderer.loadMapImage()` for other dials to follow.
-
-**Reference implementation.** `RoyaleRenderer.loadMapImage()` is the canonical example. Story 1.6+ dials needing bitmap assets should copy that shape.
+**Error posture.** Resource-load failures MUST NOT crash. Per P10, fall back gracefully and log at `error` level.
 
 ### D8: Functional analog mini-clock inside the subdial cutout (Story 1.5.2)
 

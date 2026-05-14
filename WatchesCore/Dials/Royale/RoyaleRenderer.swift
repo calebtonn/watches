@@ -1,5 +1,4 @@
 import AppKit
-import ImageIO
 import QuartzCore
 
 /// Royale — digital LCD dial homage of the Casio AE-1200WH.
@@ -111,6 +110,14 @@ public final class RoyaleRenderer: DialRenderer {
     private var lastRenderedSecondTickIndex: Int?
 
     private let mapLayer = CALayer()                // sits on LCD, visible through middle-right cutout
+    /// Continent dots not in the user's current time-zone band — light gray
+    /// (`mapDotBase`). Path includes every '#' in `mapGrid` EXCEPT those in
+    /// the highlighted column range.
+    private let mapBaseDotsLayer = CAShapeLayer()
+    /// Continent dots inside the user's current time-zone column band —
+    /// dark (`mapDotZone`). Path includes only the '#' cells inside the
+    /// highlighted column range.
+    private let mapZoneDotsLayer = CAShapeLayer()
     private let timeContainer = CALayer()           // sits on LCD, visible through bottom cutout
     private let secondaryContainer = CALayer()      // sits on LCD, visible through bottom cutout
 
@@ -444,21 +451,24 @@ public final class RoyaleRenderer: DialRenderer {
         subdialSecondTick.actions = ["transform": NSNull(), "position": NSNull()]
         lcdLayer.addSublayer(subdialSecondTick)
 
-        // World map (rendered through the middle-right cutout). Story 1.5.1:
-        // the continents are now a real PNG bitmap (`RoyaleMap.png`) bundled
-        // with WatchesCore, not a procedural CAShapeLayer path. PNG is
-        // authored at 432×168 with circular dots; `.linear` filter smooths
-        // the dots when scaled to display size.
+        // World map (rendered through the middle-right cutout). Story 1.5.1
+        // amendment: two-tone procedural dot-matrix from a hand-authored
+        // 96×32 silhouette grid. Base layer renders most continents in
+        // subdued light gray; zone layer renders the dots in the user's
+        // current time-zone column band in dark to highlight "where you are."
         mapLayer.name = "royale.map"
         mapLayer.backgroundColor = nil  // LCD background shows through
-        mapLayer.contentsGravity = .resize
-        mapLayer.magnificationFilter = .linear
-        if let mapImage = Self.loadMapImage() {
-            mapLayer.contents = mapImage
-        } else {
-            Logging.renderer.error("Royale map asset failed to load; map area will render empty")
-        }
         lcdLayer.addSublayer(mapLayer)
+
+        mapBaseDotsLayer.name = "royale.map.baseDots"
+        mapBaseDotsLayer.fillColor = RoyalePalette.mapDotBase
+        mapBaseDotsLayer.strokeColor = nil
+        mapLayer.addSublayer(mapBaseDotsLayer)
+
+        mapZoneDotsLayer.name = "royale.map.zoneDots"
+        mapZoneDotsLayer.fillColor = RoyalePalette.mapDotZone
+        mapZoneDotsLayer.strokeColor = nil
+        mapLayer.addSublayer(mapZoneDotsLayer)
 
         // Time + secondary containers (rendered through the bottom cutout).
         timeContainer.name = "royale.time"
@@ -891,9 +901,27 @@ public final class RoyaleRenderer: DialRenderer {
         // Reset rotation cache so the next tick re-renders the seconds tick.
         lastRenderedSecondTickIndex = nil
 
-        // Map — fills the middle-right cutout area. Bitmap was assigned to
-        // `mapLayer.contents` in installLayers; this just positions the frame.
-        mapLayer.frame = toLCD(cutouts.middleRight)
+        // Map — fills the middle-right cutout area. Two procedural CAShapeLayers
+        // (light base + dark zone highlight) sit on top of mapLayer.
+        let mapFrameLCD = toLCD(cutouts.middleRight)
+        mapLayer.frame = mapFrameLCD
+
+        // Time-zone column range (one of 24 zones, ~4 cols each on a 96-col
+        // grid). col 48 ≈ Greenwich; each offset hour shifts by 96/24 = 4 cols.
+        let zoneOffsetHours = Double(TimeZone.current.secondsFromGMT()) / 3600.0
+        let colsPerHour = Double(Self.mapCols) / 24.0
+        let centerCol = Double(Self.mapCols) / 2.0 + zoneOffsetHours * colsPerHour
+        let zoneStart = Int((centerCol - colsPerHour / 2.0).rounded())
+        let zoneEnd   = Int((centerCol + colsPerHour / 2.0).rounded()) - 1
+
+        let mapPaths = Self.continentDotPaths(
+            size: mapFrameLCD.size,
+            zoneColRange: zoneStart...zoneEnd
+        )
+        mapBaseDotsLayer.frame = CGRect(origin: .zero, size: mapFrameLCD.size)
+        mapBaseDotsLayer.path = mapPaths.base
+        mapZoneDotsLayer.frame = CGRect(origin: .zero, size: mapFrameLCD.size)
+        mapZoneDotsLayer.path = mapPaths.zone
 
         // Bottom cutout vertical bands (LCD-local y-up, fractions of cutout height):
         //   0.00 – 0.04   bottom margin
@@ -1209,25 +1237,79 @@ public final class RoyaleRenderer: DialRenderer {
         }
     }
 
-    /// Loads `RoyaleMap.png` from the WatchesCore framework bundle. Returns
-    /// `nil` on any failure (file missing, decode error, framework bundle
-    /// path resolution failure) — per P10 the renderer never crashes on a
-    /// missing resource. Caller logs and falls back to an empty map.
-    ///
-    /// `Bundle(for: RoyaleRenderer.self)` resolves to WatchesCore.framework,
-    /// NOT `Bundle.main` (which is the screensaver host process —
-    /// legacyScreenSaver.appex). This is the bundle-resource pattern that
-    /// future dials with PNG/binary assets should follow.
-    private static func loadMapImage() -> CGImage? {
-        let bundle = Bundle(for: RoyaleRenderer.self)
-        guard let url = bundle.url(forResource: "RoyaleMap", withExtension: "png") else {
-            return nil
+    // MARK: - Procedural world map (Story 1.5.1 amendment)
+
+    /// 96 × 32 dot-matrix continent silhouette grid. Atlantic-centered:
+    /// col 0 = far west (~180°W), col 48 ≈ Greenwich (0°), col 95 = far east
+    /// (~180°E). Row 0 is the northernmost row.
+    private static let mapCols = 96
+    private static let mapRows = 32
+    private static let mapGrid: [String] = [
+        "................................................................................................",
+        "...........................####.................................................................",
+        "....########..............#######................###########################.#.######...........",
+        "...##########.............########.......################################################.......",
+        "....#########..............#######..............######.##################################.......",
+        ".....#########.##########...#####...##.......##.#########################################.#.....",
+        "......###################....###.............##########################################.#.#.....",
+        ".......##################.....................#######################################.#.#.......",
+        "........#################......................####.#####.#########################...###.......",
+        "........##################.....................#####.################################...........",
+        ".........##################....................#####################################............",
+        "...........########..#####.....................##################################...............",
+        ".............#####....#.##.#...................################################.#.#.............",
+        "..............####........#.....................#########.##################..#.###.............",
+        "...............###...............................#########..#############.#.....###.............",
+        "................###...............................########......###########...#####.............",
+        ".................##..#######......................#######..........#..#..############.#.........",
+        "...................###########....................######.................##############.........",
+        "...................############...................#####...................############.#........",
+        "...................############....................####...#................#......#######.......",
+        "...................###########......................###...##......................###########...",
+        "....................#########.......................###...#......................#############..",
+        ".....................#######........................##..........................##############..",
+        "......................#####.........................##...........................############...",
+        "......................####..........................#.............................##########....",
+        "......................###..........................................................######.......",
+        "......................##..............................................................##........",
+        "......................#.........................................................................",
+        "................................................................................................",
+        "................................................................................................",
+        "................................................................................................",
+        "................................................................................................",
+    ]
+
+    /// Builds two CGPaths from `mapGrid`: one for cells OUTSIDE the highlighted
+    /// time-zone column range (light gray dots), one for cells INSIDE the range
+    /// (dark dots). Both paths are in map-layer-local coordinates.
+    private static func continentDotPaths(
+        size: CGSize,
+        zoneColRange: ClosedRange<Int>
+    ) -> (base: CGPath, zone: CGPath) {
+        let basePath = CGMutablePath()
+        let zonePath = CGMutablePath()
+        let cellW = size.width / CGFloat(mapCols)
+        let cellH = size.height / CGFloat(mapRows)
+        let dotR = min(cellW, cellH) * 0.46
+
+        for (rowIdx, rowStr) in mapGrid.enumerated() {
+            // Row 0 is north (top) in the array; CALayer y is up, so flip.
+            let yIdx = mapRows - 1 - rowIdx
+            let cy = (CGFloat(yIdx) + 0.5) * cellH
+            for (colIdx, char) in rowStr.enumerated() where char == "#" {
+                let cx = (CGFloat(colIdx) + 0.5) * cellW
+                let rect = CGRect(
+                    x: cx - dotR, y: cy - dotR,
+                    width: dotR * 2, height: dotR * 2
+                )
+                if zoneColRange.contains(colIdx) {
+                    zonePath.addEllipse(in: rect)
+                } else {
+                    basePath.addEllipse(in: rect)
+                }
+            }
         }
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-            return nil
-        }
-        return image
+        return (base: basePath, zone: zonePath)
     }
 
     /// Just the phillips cross-slot of the screw (two perpendicular line

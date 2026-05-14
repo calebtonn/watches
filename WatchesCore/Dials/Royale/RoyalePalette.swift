@@ -36,10 +36,25 @@ public enum RoyalePalette {
         srgbRed: 0.72, green: 0.74, blue: 0.58, alpha: 1.0
     ).cgColor
 
-    /// Continent dot color, for the dot-matrix world map. Dark — same family
-    /// as `litSegment` since we're a positive LCD.
+    /// Continent dot color (LEGACY — left for reference; superseded by
+    /// `mapDotBase` and `mapDotZone` which implement the two-tone time-zone
+    /// highlight added in the Story 1.5.1 amendment).
     public static let mapDot: CGColor = NSColor(
         srgbRed: 0.18, green: 0.19, blue: 0.17, alpha: 1.0
+    ).cgColor
+
+    /// Base continent dot color — light gray, subdued contrast against the
+    /// olive LCD background. Used for every dot NOT in the user's current
+    /// time-zone column band.
+    public static let mapDotBase: CGColor = NSColor(
+        srgbRed: 0.46, green: 0.48, blue: 0.38, alpha: 1.0
+    ).cgColor
+
+    /// Highlighted continent dot color — dark, high contrast. Used for the
+    /// ~4-column vertical band representing the user's current time zone on
+    /// the Atlantic-centered map projection (`TimeZone.current.secondsFromGMT`).
+    public static let mapDotZone: CGColor = NSColor(
+        srgbRed: 0.10, green: 0.11, blue: 0.10, alpha: 1.0
     ).cgColor
 
     // MARK: Case / bezel / faceplate
